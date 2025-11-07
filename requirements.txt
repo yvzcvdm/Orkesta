@@ -1,0 +1,18 @@
+# GTK ve UI Bağımlılıkları
+PyGObject>=3.42.0
+pycairo>=1.20.0
+
+# Sistem ve Süreç Yönetimi
+psutil>=5.9.0
+
+# Yapılandırma Yönetimi
+pyyaml>=6.0
+
+# Veritabanı Yönetimi (Optional - her servis kendi modülünü yükleyecek)
+# pymysql
+# psycopg2-binary
+# pymongo
+# redis
+
+# Loglama ve Debugging
+python-dotenv>=1.0.0
