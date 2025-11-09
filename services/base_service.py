@@ -1,11 +1,16 @@
 """
 Base Service Class
+
+Prensip: Servisler SADECE script'leri çağırır, işlem yapmaz!
+Script-First Approach: Her işlem için ayrı script var.
 """
 
 from abc import ABC, abstractmethod
 from typing import Optional, Dict, List, Tuple, Any
 from enum import Enum
 import logging
+import subprocess
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +19,9 @@ try:
     _ = get_i18n().get_translator()
 except:
     _ = lambda s: s
+
+# Script dizini
+SCRIPTS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'scripts')
 
 
 class ServiceStatus(Enum):
@@ -31,6 +39,12 @@ class ServiceType(Enum):
 
 
 class BaseService(ABC):
+    """
+    Ultra-minimal Base Service Class
+    
+    Servisler SADECE script'leri çağırır!
+    Tüm bilgiler ve iş mantığı script'lerde.
+    """
     
     def __init__(self, platform_manager):
         self.platform_manager = platform_manager
@@ -39,59 +53,34 @@ class BaseService(ABC):
     @property
     @abstractmethod
     def name(self) -> str:
+        """Service name (tek zorunlu property)"""
         pass
     
+    # Optional properties with defaults (UI compatibility)
     @property
-    @abstractmethod
     def display_name(self) -> str:
-        pass
+        """Display name for UI (default: capitalized name)"""
+        return self.name.upper()
     
     @property
-    @abstractmethod
     def description(self) -> str:
-        pass
+        """Service description (optional)"""
+        return f"{self.display_name} service"
     
     @property
-    @abstractmethod
-    def service_type(self) -> ServiceType:
-        pass
-    
-    @property
-    @abstractmethod
     def icon_name(self) -> str:
-        pass
+        """Icon name (optional)"""
+        return "application-x-executable"
     
     @property
-    @abstractmethod
-    def package_names(self) -> Dict[str, List[str]]:
-        pass
+    def service_type(self) -> ServiceType:
+        """Service type (optional, default: OTHER)"""
+        return ServiceType.OTHER
     
     @property
-    @abstractmethod
-    def systemd_service_name(self) -> Optional[str]:
-        pass
-    
-    @property
-    @abstractmethod
     def default_port(self) -> Optional[int]:
-        pass
-    
-    @property
-    @abstractmethod
-    def config_file_paths(self) -> Dict[str, str]:
-        pass
-    
-    @abstractmethod
-    def get_configuration_options(self) -> List[Dict[str, Any]]:
-        pass
-    
-    def get_packages_for_current_os(self) -> List[str]:
-        os_type = self.platform_manager.os_type.value
-        return self.package_names.get(os_type, [])
-    
-    def get_config_file_for_current_os(self) -> Optional[str]:
-        os_type = self.platform_manager.os_type.value
-        return self.config_file_paths.get(os_type)
+        """Default port for the service (optional)"""
+        return None
     
     def get_status(self) -> ServiceStatus:
         if not self.is_installed():
@@ -136,3 +125,85 @@ class BaseService(ABC):
     @abstractmethod
     def disable(self) -> Tuple[bool, str]:
         pass
+    
+    # ============================================
+    # HELPER METHODS - Script Execution
+    # ============================================
+    
+    def _execute_script(self, script_path: str, *args, use_pkexec: bool = True, timeout: int = 300) -> Tuple[bool, str]:
+        """
+        Script çalıştır (CLI-First yaklaşımı)
+        
+        Args:
+            script_path: Script yolu (örn: scripts/apache/install.sh)
+            args: Script parametreleri
+            use_pkexec: PolicyKit kullan (GUI için)
+            timeout: Timeout (saniye)
+        
+        Returns:
+            (success: bool, message: str)
+        """
+        # Script tam yolu
+        if not os.path.isabs(script_path):
+            script_path = os.path.join(SCRIPTS_DIR, script_path)
+        
+        # Script var mı kontrol et
+        if not os.path.exists(script_path):
+            logger.error(f"Script bulunamadı: {script_path}")
+            return False, _("Script file not found: {path}").format(path=script_path)
+        
+        # Read-only komutlar - sudo gerektirmez
+        readonly_commands = [
+            'is-installed', 'is-running', 'version-get-active', 
+            'version-list-installed', 'version-list-available',
+            'vhost-list', 'vhost-details', 'extension-list',
+            'database-list', 'user-list', 'status-info',
+            'php-list-versions', 'php-get-active', 'ssl-is-enabled',
+            'get-version', 'config-get', 'log-tail', 'log-view'
+        ]
+        
+        # İlk argüman read-only komut mu?
+        needs_sudo = True
+        if args and args[0] in readonly_commands:
+            needs_sudo = False
+        
+        # Komutu oluştur
+        cmd = []
+        if needs_sudo:
+            cmd.append('sudo')
+        
+        cmd.append(script_path)
+        cmd.extend(args)
+        
+        logger.info(f"Script çalıştırılıyor: {' '.join(cmd)}")
+        
+        try:
+            result = subprocess.run(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=timeout,
+                text=True
+            )
+            
+            if result.returncode == 0:
+                message = result.stdout.strip() or _("Operation completed successfully")
+                logger.info(f"Script başarılı: {script_path}")
+                return True, message
+            else:
+                error = result.stderr.strip() or result.stdout.strip() or _("Unknown error")
+                logger.error(f"Script hatası ({script_path}): {error}")
+                
+                # PolicyKit cancelled check
+                if "cancelled" in error.lower() or "authentication failed" in error.lower():
+                    return False, _("Authentication cancelled or failed")
+                
+                return False, error
+        
+        except subprocess.TimeoutExpired:
+            logger.error(f"Script timeout: {script_path}")
+            return False, _("Operation timed out")
+        
+        except Exception as e:
+            logger.error(f"Script execution error: {e}")
+            return False, str(e)

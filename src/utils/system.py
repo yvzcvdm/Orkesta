@@ -204,23 +204,6 @@ def ensure_directory(directory: str) -> bool:
         return False
 
 
-def get_file_size(file_path: str) -> Optional[int]:
-    """
-    Dosya boyutunu döndür (bytes)
-    
-    Args:
-        file_path: Dosya yolu
-    
-    Returns:
-        Dosya boyutu veya None
-    """
-    try:
-        return os.path.getsize(file_path)
-    except Exception as e:
-        logger.error(f"Dosya boyutu alma hatası ({file_path}): {e}")
-        return None
-
-
 def is_command_available(command: str) -> bool:
     """
     Komutun sistemde mevcut olup olmadığını kontrol et
@@ -241,3 +224,45 @@ def is_command_available(command: str) -> bool:
         return result.returncode == 0
     except Exception:
         return False
+
+
+def run_command_with_pkexec(command: List[str], timeout: int = 300) -> Tuple[bool, str, str]:
+    """
+    Komutu pkexec (PolicyKit) ile çalıştır
+    
+    Args:
+        command: Komut listesi
+        timeout: Zaman aşımı (saniye)
+    
+    Returns:
+        (success: bool, stdout: str, stderr: str)
+    """
+    try:
+        # pkexec kullanarak komutu çalıştır
+        full_command = ['pkexec'] + command
+        
+        logger.info(f"pkexec ile komut çalıştırılıyor: {' '.join(command)}")
+        
+        result = subprocess.run(
+            full_command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=timeout,
+            text=True
+        )
+        
+        success = result.returncode == 0
+        stdout = result.stdout
+        stderr = result.stderr
+        
+        if not success:
+            logger.warning(f"pkexec komutu başarısız: {stderr}")
+        
+        return success, stdout, stderr
+    
+    except subprocess.TimeoutExpired:
+        logger.error("pkexec komutu zaman aşımına uğradı")
+        return False, "", "Command timed out"
+    except Exception as e:
+        logger.error(f"pkexec komut hatası: {e}")
+        return False, "", str(e)

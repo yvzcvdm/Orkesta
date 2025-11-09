@@ -30,7 +30,7 @@ message = _("Service installed successfully")
 ```bash
 # Extract all translatable strings
 # Tüm çevrilebilir metinleri çıkar
-python extract_translations.py
+python translations.py
 
 # This will:
 # Bu script:
@@ -80,7 +80,7 @@ locale/
 
 4. **Compile and test / Derle ve test et**
    ```bash
-   python extract_translations.py
+   python translations.py
    python main.py
    ```
 

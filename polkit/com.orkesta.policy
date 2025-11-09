@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC
+ "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<policyconfig>
+
+  <vendor>Orkesta</vendor>
+  <vendor_url>https://github.com/orkesta</vendor_url>
+
+  <!-- Apache Management -->
+  <action id="com.orkesta.apache">
+    <description>Manage Apache HTTP Server</description>
+    <message>Authentication is required to manage Apache HTTP Server</message>
+    <icon_name>network-server</icon_name>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/media/yavuz/Depo/Developer/Orkesta/scripts/apache.sh</annotate>
+    <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
+  </action>
+
+  <!-- MySQL Management -->
+  <action id="com.orkesta.mysql">
+    <description>Manage MySQL Database Server</description>
+    <message>Authentication is required to manage MySQL Database Server</message>
+    <icon_name>database</icon_name>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/media/yavuz/Depo/Developer/Orkesta/scripts/mysql.sh</annotate>
+    <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
+  </action>
+
+  <!-- PHP Management -->
+  <action id="com.orkesta.php">
+    <description>Manage PHP</description>
+    <message>Authentication is required to manage PHP</message>
+    <icon_name>application-x-php</icon_name>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/media/yavuz/Depo/Developer/Orkesta/scripts/php.sh</annotate>
+    <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
+  </action>
+
+  <!-- Generic Script Execution -->
+  <action id="com.orkesta.script">
+    <description>Execute Orkesta management scripts</description>
+    <message>Authentication is required to execute Orkesta management scripts</message>
+    <icon_name>application-x-executable</icon_name>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
+  </action>
+
+</policyconfig>

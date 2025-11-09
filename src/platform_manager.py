@@ -1,15 +1,20 @@
 """
-Platform Manager - İşletim Sistemi ve Paket Yöneticisi Tespiti
+Platform Manager - İşletim Sistemi ve Sistem Bilgileri
 
-Bu modül sistemdeki işletim sistemini tespit eder ve uygun paket yöneticisini belirler.
-Desteklenen sistemler: Fedora, Debian/Ubuntu, Arch Linux
+Bu modül SADECE bilgi toplar ve sağlar - işlem yapmaz!
+- OS detection (Fedora, Debian/Ubuntu, Arch)
+- Package manager detection (dnf, apt, pacman)
+- Package installation status (read-only)
+- Service status (read-only)
+
+Prensip: Scripts işlem yapar, PlatformManager sadece bilgi verir.
 """
 
 import os
 import subprocess
 import platform
 from enum import Enum
-from typing import Optional, Dict, List
+from typing import Dict, List
 import logging
 
 logger = logging.getLogger(__name__)
@@ -134,51 +139,9 @@ class PlatformManager:
             logger.error(f"Kernel versiyonu alınamadı: {e}")
             self.kernel_version = "Unknown"
     
-    def get_install_command(self, package_name: str, use_pkexec: bool = True) -> List[str]:
-        """
-        Paket kurulum komutunu döndür
-        
-        Args:
-            package_name: Kurulacak paket adı
-            use_pkexec: GUI için pkexec kullan (PolicyKit), False ise sudo
-        """
-        sudo_cmd = ['pkexec'] if use_pkexec else ['sudo']
-        
-        commands = {
-            PackageManager.DNF: sudo_cmd + ['dnf', 'install', '-y', package_name],
-            PackageManager.YUM: sudo_cmd + ['yum', 'install', '-y', package_name],
-            PackageManager.APT: sudo_cmd + ['apt', 'install', '-y', package_name],
-            PackageManager.PACMAN: sudo_cmd + ['pacman', '-S', '--noconfirm', package_name]
-        }
-        return commands.get(self.package_manager, [])
-    
-    def get_remove_command(self, package_name: str, use_pkexec: bool = True) -> List[str]:
-        """
-        Paket kaldırma komutunu döndür
-        
-        Args:
-            package_name: Kaldırılacak paket adı
-            use_pkexec: GUI için pkexec kullan (PolicyKit), False ise sudo
-        """
-        sudo_cmd = ['pkexec'] if use_pkexec else ['sudo']
-        
-        commands = {
-            PackageManager.DNF: sudo_cmd + ['dnf', 'remove', '-y', package_name],
-            PackageManager.YUM: sudo_cmd + ['yum', 'remove', '-y', package_name],
-            PackageManager.APT: sudo_cmd + ['apt', 'remove', '-y', package_name],
-            PackageManager.PACMAN: sudo_cmd + ['pacman', '-R', '--noconfirm', package_name]
-        }
-        return commands.get(self.package_manager, [])
-    
-    def get_update_command(self) -> List[str]:
-        """Paket listesi güncelleme komutunu döndür"""
-        commands = {
-            PackageManager.DNF: ['sudo', 'dnf', 'check-update'],
-            PackageManager.YUM: ['sudo', 'yum', 'check-update'],
-            PackageManager.APT: ['sudo', 'apt', 'update'],
-            PackageManager.PACMAN: ['sudo', 'pacman', '-Sy']
-        }
-        return commands.get(self.package_manager, [])
+    # ============================================
+    # PACKAGE INFORMATION (READ-ONLY)
+    # ============================================
     
     def is_package_installed(self, package_name: str) -> bool:
         """Paketin kurulu olup olmadığını kontrol et"""
@@ -215,21 +178,9 @@ class PlatformManager:
             logger.error(f"Paket kontrolü başarısız ({package_name}): {e}")
             return False
     
-    def get_service_command(self, action: str, service_name: str, use_pkexec: bool = True) -> List[str]:
-        """
-        Systemd servis komutunu döndür
-        
-        Args:
-            action: start, stop, restart, status, enable, disable
-            service_name: Servis adı
-            use_pkexec: GUI için pkexec kullan (PolicyKit), False ise sudo
-        """
-        valid_actions = ['start', 'stop', 'restart', 'status', 'enable', 'disable']
-        if action not in valid_actions:
-            raise ValueError(f"Invalid action: {action}")
-        
-        sudo_cmd = ['pkexec'] if use_pkexec else ['sudo']
-        return sudo_cmd + ['systemctl', action, service_name]
+    # ============================================
+    # SERVICE INFORMATION (READ-ONLY)
+    # ============================================
     
     def is_service_active(self, service_name: str) -> bool:
         """Servisin aktif olup olmadığını kontrol et"""
@@ -245,19 +196,9 @@ class PlatformManager:
             logger.error(f"Servis kontrolü başarısız ({service_name}): {e}")
             return False
     
-    def is_service_enabled(self, service_name: str) -> bool:
-        """Servisin enabled olup olmadığını kontrol et"""
-        try:
-            result = subprocess.run(
-                ['systemctl', 'is-enabled', service_name],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                timeout=5
-            )
-            return result.stdout.decode().strip() == 'enabled'
-        except Exception as e:
-            logger.error(f"Servis enable kontrolü başarısız ({service_name}): {e}")
-            return False
+    # ============================================
+    # SYSTEM INFORMATION
+    # ============================================
     
     def get_system_info_dict(self) -> Dict[str, str]:
         """Sistem bilgilerini dict olarak döndür"""

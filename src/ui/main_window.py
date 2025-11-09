@@ -9,6 +9,8 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, GLib, Gio
 import logging
+import os
+import subprocess
 from src.utils.i18n import get_i18n
 
 logger = logging.getLogger(__name__)
@@ -305,10 +307,6 @@ class MainWindow(Adw.ApplicationWindow):
         
         return content_box
     
-    def _create_content_area(self):
-        """DEPRECATED - use _create_service_list_page"""
-        return self._create_service_list_page()
-    
     def _load_services(self):
         """Servisleri yükle ve göster"""
         # Mevcut servisleri temizle
@@ -415,7 +413,7 @@ class MainWindow(Adw.ApplicationWindow):
         # Onay dialog'u göster
         dialog = Adw.MessageDialog.new(self)
         dialog.set_heading(_("Install {service}?").format(service=service.display_name))
-        dialog.set_body(_("This will install {service} and its dependencies. Administrator password will be required.").format(service=service.display_name))
+        dialog.set_body(_("A terminal window will open. Please enter your password when prompted.").format(service=service.display_name))
         
         dialog.add_response("cancel", _("Cancel"))
         dialog.add_response("install", _("Install"))
@@ -425,19 +423,37 @@ class MainWindow(Adw.ApplicationWindow):
         
         def on_response(dialog, response):
             if response == "install":
-                self._show_loading_dialog(_("Installing {service}...").format(service=service.display_name))
+                # Script yolunu bul
+                script_path = os.path.join(
+                    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                    'scripts',
+                    f'{service.name}.sh'
+                )
                 
-                def install_thread():
+                # Terminal komutları
+                terminal_commands = [
+                    ['gnome-terminal', '--', 'bash', '-c', 
+                     f'echo "Installing {service.display_name}..."; echo ""; sudo bash "{script_path}" install; echo ""; echo "Press Enter to close..."; read'],
+                    ['xterm', '-e', 
+                     f'bash -c "echo \\"Installing {service.display_name}...\\"; echo \\"\\"; sudo bash \\"{script_path}\\" install; echo \\"\\"; echo \\"Press Enter to close...\\"; read"'],
+                    ['konsole', '-e', 
+                     f'bash -c "echo \\"Installing {service.display_name}...\\"; echo \\"\\"; sudo bash \\"{script_path}\\" install; echo \\"\\"; echo \\"Press Enter to close...\\"; read"'],
+                ]
+                
+                success = False
+                for cmd in terminal_commands:
                     try:
-                        success, message = service.install()
-                        GLib.idle_add(self._on_operation_complete, success, message)
-                    except Exception as e:
-                        logger.error(f"Install thread error: {e}")
-                        GLib.idle_add(self._on_operation_complete, False, str(e))
+                        subprocess.Popen(cmd)
+                        success = True
+                        self._show_toast(_("Terminal opened. Please complete installation there."))
+                        # Servisleri yenile (3 saniye sonra)
+                        GLib.timeout_add_seconds(3, self._load_services)
+                        break
+                    except:
+                        continue
                 
-                import threading
-                thread = threading.Thread(target=install_thread, daemon=True)
-                thread.start()
+                if not success:
+                    self._show_toast(_("Could not open terminal. Install manually: sudo bash {script} install").format(script=script_path))
         
         dialog.connect("response", on_response)
         dialog.present()
@@ -447,7 +463,7 @@ class MainWindow(Adw.ApplicationWindow):
         # Onay dialog'u göster
         dialog = Adw.MessageDialog.new(self)
         dialog.set_heading(_("Uninstall {service}?").format(service=service.display_name))
-        dialog.set_body(_("This will remove {service} from your system. Administrator password will be required.").format(service=service.display_name))
+        dialog.set_body(_("A terminal window will open. Please enter your password when prompted.").format(service=service.display_name))
         
         dialog.add_response("cancel", _("Cancel"))
         dialog.add_response("uninstall", _("Uninstall"))
@@ -457,19 +473,37 @@ class MainWindow(Adw.ApplicationWindow):
         
         def on_response(dialog, response):
             if response == "uninstall":
-                self._show_loading_dialog(_("Uninstalling {service}...").format(service=service.display_name))
+                # Script yolunu bul
+                script_path = os.path.join(
+                    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                    'scripts',
+                    f'{service.name}.sh'
+                )
                 
-                def uninstall_thread():
+                # Terminal komutları
+                terminal_commands = [
+                    ['gnome-terminal', '--', 'bash', '-c', 
+                     f'echo "Uninstalling {service.display_name}..."; echo ""; sudo bash "{script_path}" uninstall; echo ""; echo "Press Enter to close..."; read'],
+                    ['xterm', '-e', 
+                     f'bash -c "echo \\"Uninstalling {service.display_name}...\\"; echo \\"\\"; sudo bash \\"{script_path}\\" uninstall; echo \\"\\"; echo \\"Press Enter to close...\\"; read"'],
+                    ['konsole', '-e', 
+                     f'bash -c "echo \\"Uninstalling {service.display_name}...\\"; echo \\"\\"; sudo bash \\"{script_path}\\" uninstall; echo \\"\\"; echo \\"Press Enter to close...\\"; read"'],
+                ]
+                
+                success = False
+                for cmd in terminal_commands:
                     try:
-                        success, message = service.uninstall()
-                        GLib.idle_add(self._on_operation_complete, success, message)
-                    except Exception as e:
-                        logger.error(f"Uninstall thread error: {e}")
-                        GLib.idle_add(self._on_operation_complete, False, str(e))
+                        subprocess.Popen(cmd)
+                        success = True
+                        self._show_toast(_("Terminal opened. Please complete uninstallation there."))
+                        # Servisleri yenile (3 saniye sonra)
+                        GLib.timeout_add_seconds(3, self._load_services)
+                        break
+                    except:
+                        continue
                 
-                import threading
-                thread = threading.Thread(target=uninstall_thread, daemon=True)
-                thread.start()
+                if not success:
+                    self._show_toast(_("Could not open terminal. Uninstall manually: sudo bash {script} uninstall").format(script=script_path))
         
         dialog.connect("response", on_response)
         dialog.present()
@@ -479,18 +513,27 @@ class MainWindow(Adw.ApplicationWindow):
         success, message = service.start()
         self._show_toast(message)
         self._load_services()
+        # Detay sayfasındaysak yenile
+        if self.current_service and self.current_service.name == service.name:
+            self._refresh_detail_page()
     
     def _on_service_stop(self, service):
         """Stop service"""
         success, message = service.stop()
         self._show_toast(message)
         self._load_services()
+        # Detay sayfasındaysak yenile
+        if self.current_service and self.current_service.name == service.name:
+            self._refresh_detail_page()
     
     def _on_service_restart(self, service):
         """Restart service"""
         success, message = service.restart()
         self._show_toast(message)
         self._load_services()
+        # Detay sayfasındaysak yenile
+        if self.current_service and self.current_service.name == service.name:
+            self._refresh_detail_page()
     
     def _show_loading_dialog(self, message):
         """Show loading dialog with progress"""
@@ -553,24 +596,46 @@ class MainWindow(Adw.ApplicationWindow):
         try:
             # Progress animation'ı durdur
             if hasattr(self, 'progress_timeout_id') and self.progress_timeout_id:
-                GLib.source_remove(self.progress_timeout_id)
+                try:
+                    GLib.source_remove(self.progress_timeout_id)
+                except:
+                    pass
                 self.progress_timeout_id = None
             
             # Progress bar referansını temizle
             if hasattr(self, 'progress_bar'):
                 self.progress_bar = None
             
+            # Progress label referansını temizle
+            if hasattr(self, 'progress_label'):
+                self.progress_label = None
+            
             # Dialog'u kapat
             if hasattr(self, 'progress_dialog') and self.progress_dialog:
-                self.progress_dialog.close()
+                try:
+                    self.progress_dialog.close()
+                except:
+                    pass
                 self.progress_dialog = None
             
-            # Toast göster ve servisleri yenile
+            # Toast göster
             self._show_toast(message)
+            
+            # Hata mesajı varsa göster
+            if not success and message:
+                error_dialog = Adw.MessageDialog.new(self)
+                error_dialog.set_heading(_("Operation Failed"))
+                error_dialog.set_body(message)
+                error_dialog.add_response("ok", _("OK"))
+                error_dialog.set_default_response("ok")
+                error_dialog.present()
             
             # Servisleri yeniden yükle
             try:
                 self._load_services()
+                # Detay sayfasındaysak yenile
+                if self.current_service:
+                    self._refresh_detail_page()
             except Exception as e:
                 logger.error(f"Error reloading services: {e}")
         
@@ -620,6 +685,23 @@ class MainWindow(Adw.ApplicationWindow):
         # Detay sayfasına geç
         self.main_stack.set_visible_child_name("detail")
         self.back_button.set_visible(True)
+    
+    def _refresh_detail_page(self):
+        """Refresh the current detail page"""
+        if self.current_service:
+            # Detay sayfasını yeniden oluştur
+            detail_page = self._create_service_detail_page(self.current_service)
+            
+            # Eski detay sayfasını kaldır
+            old_detail = self.main_stack.get_child_by_name("detail")
+            if old_detail:
+                self.main_stack.remove(old_detail)
+            
+            # Yeni detay sayfasını ekle
+            self.main_stack.add_named(detail_page, "detail")
+            
+            # Detay sayfasını göster (zaten gösteriliyorsa değişmez)
+            self.main_stack.set_visible_child_name("detail")
     
     def _create_service_detail_page(self, service):
         """Create service detail page"""
@@ -735,6 +817,10 @@ class MainWindow(Adw.ApplicationWindow):
             actions_group.add(install_row)
         
         main_box.append(actions_group)
+        
+        # Apache specific sections
+        if service.name == "apache" and service.is_installed():
+            self._add_apache_sections(main_box, service)
         
         # MySQL specific sections
         if service.name == "mysql" and service.is_installed():
@@ -937,7 +1023,8 @@ class MainWindow(Adw.ApplicationWindow):
                 if success:
                     dialog.close()
                     # Refresh detail page
-                    self._show_service_detail(service)
+                    if self.current_service and self.current_service.name == service.name:
+                        self._refresh_detail_page()
         
         dialog.connect("response", on_response)
         dialog.present()
@@ -1004,7 +1091,8 @@ class MainWindow(Adw.ApplicationWindow):
                 if success:
                     dialog.close()
                     # Refresh detail page
-                    self._show_service_detail(service)
+                    if self.current_service and self.current_service.name == service.name:
+                        self._refresh_detail_page()
         
         dialog.connect("response", on_response)
         dialog.present()
@@ -1065,6 +1153,696 @@ class MainWindow(Adw.ApplicationWindow):
                 
                 if success:
                     dialog.close()
+                    # Refresh detail page
+                    if self.current_service and self.current_service.name == service.name:
+                        self._refresh_detail_page()
+        
+        dialog.connect("response", on_response)
+        dialog.present()
+    
+    def _add_apache_sections(self, main_box, service):
+        """Add Apache-specific sections to detail page"""
+        
+        # PHP Version Management
+        php_group = Adw.PreferencesGroup()
+        php_group.set_title(_("PHP Configuration"))
+        
+        try:
+            php_versions = service.get_installed_php_versions()
+            active_version = service.get_active_php_version()
+            
+            # Active PHP version row
+            php_version_row = Adw.ActionRow()
+            php_version_row.set_title(_("Active PHP Version"))
+            if active_version:
+                php_version_label = Gtk.Label(label=f"PHP {active_version}")
+                php_version_label.add_css_class("monospace")
+                php_version_row.add_suffix(php_version_label)
+            else:
+                php_version_label = Gtk.Label(label=_("Not detected"))
+                php_version_label.add_css_class("dim-label")
+                php_version_row.add_suffix(php_version_label)
+            php_group.add(php_version_row)
+            
+            # Switch PHP version (if multiple versions available)
+            if len(php_versions) > 1:
+                switch_php_row = Adw.ActionRow()
+                switch_php_row.set_title(_("Switch PHP Version"))
+                switch_php_row.set_subtitle(_("Change the active PHP version for Apache"))
+                switch_php_row.set_activatable(True)
+                switch_php_row.connect("activated", lambda r: self._on_apache_switch_php(service, php_versions))
+                switch_php_icon = Gtk.Image.new_from_icon_name("emblem-synchronizing-symbolic")
+                switch_php_row.add_prefix(switch_php_icon)
+                php_group.add(switch_php_row)
+            elif php_versions:
+                info_label = Gtk.Label()
+                info_label.set_markup(f"<span size='small'>{_('Installed: ')} {', '.join(php_versions)}</span>")
+                info_label.set_halign(Gtk.Align.START)
+                info_label.set_margin_top(6)
+                info_label.add_css_class("dim-label")
+                # Add as a separate row
+                info_row = Adw.ActionRow()
+                info_row.set_title(_("Installed Versions"))
+                info_row.set_subtitle(', '.join(f"PHP {v}" for v in php_versions))
+                php_group.add(info_row)
+        
+        except Exception as e:
+            logger.error(f"Error getting PHP info: {e}")
+        
+        main_box.append(php_group)
+        
+        # SSL Configuration
+        ssl_group = Adw.PreferencesGroup()
+        ssl_group.set_title(_("SSL/HTTPS Configuration"))
+        
+        try:
+            ssl_enabled = service.is_ssl_module_enabled()
+            
+            # SSL status row
+            ssl_status_row = Adw.ActionRow()
+            ssl_status_row.set_title(_("SSL Module"))
+            if ssl_enabled:
+                ssl_status_label = Gtk.Label(label="✅ Enabled")
+                ssl_status_label.add_css_class("success")
+            else:
+                ssl_status_label = Gtk.Label(label="❌ Disabled")
+                ssl_status_label.add_css_class("error")
+            ssl_status_row.add_suffix(ssl_status_label)
+            ssl_group.add(ssl_status_row)
+            
+            if not ssl_enabled:
+                # Enable SSL button
+                enable_ssl_row = Adw.ActionRow()
+                enable_ssl_row.set_title(_("Enable SSL Module"))
+                enable_ssl_row.set_subtitle(_("Enable HTTPS support in Apache"))
+                enable_ssl_row.set_activatable(True)
+                enable_ssl_row.connect("activated", lambda r: self._on_apache_enable_ssl(service))
+                enable_ssl_icon = Gtk.Image.new_from_icon_name("security-high-symbolic")
+                enable_ssl_row.add_prefix(enable_ssl_icon)
+                ssl_group.add(enable_ssl_row)
+            else:
+                # Create self-signed certificate button
+                create_cert_row = Adw.ActionRow()
+                create_cert_row.set_title(_("Create Self-Signed Certificate"))
+                create_cert_row.set_subtitle(_("Generate SSL certificate for a domain"))
+                create_cert_row.set_activatable(True)
+                create_cert_row.connect("activated", lambda r: self._on_apache_create_certificate(service))
+                create_cert_icon = Gtk.Image.new_from_icon_name("document-new-symbolic")
+                create_cert_row.add_prefix(create_cert_icon)
+                ssl_group.add(create_cert_row)
+        
+        except Exception as e:
+            logger.error(f"Error getting SSL info: {e}")
+        
+        main_box.append(ssl_group)
+        
+        # Virtual Hosts Management
+        vhosts_group = Adw.PreferencesGroup()
+        vhosts_group.set_title(_("Virtual Hosts"))
+        
+        try:
+            vhosts = service.list_vhosts()
+            
+            # Create vhost button
+            create_vhost_row = Adw.ActionRow()
+            create_vhost_row.set_title(_("Create Virtual Host"))
+            create_vhost_row.set_subtitle(_("Add a new website configuration"))
+            create_vhost_row.set_activatable(True)
+            create_vhost_row.connect("activated", lambda r: self._on_apache_create_vhost(service))
+            create_vhost_icon = Gtk.Image.new_from_icon_name("list-add-symbolic")
+            create_vhost_row.add_prefix(create_vhost_icon)
+            vhosts_group.add(create_vhost_row)
+            
+            # List existing vhosts
+            if vhosts:
+                # Add separator
+                separator_row = Adw.ActionRow()
+                separator_row.set_title(_("Existing Virtual Hosts"))
+                separator_row.set_sensitive(False)
+                vhosts_group.add(separator_row)
+                
+                for vhost in vhosts:
+                    vhost_row = Adw.ActionRow()
+                    
+                    # Use filename as title if server_name not available
+                    # Don't call get_vhost_details here to avoid blocking
+                    title = vhost.get('server_name', vhost.get('filename', 'Unknown'))
+                    if title.endswith('.conf'):
+                        title = title[:-5]  # Remove .conf extension
+                    
+                    vhost_row.set_title(title)
+                    
+                    # Subtitle with basic info
+                    subtitle_parts = []
+                    if vhost.get('enabled'):
+                        subtitle_parts.append("✅ Enabled")
+                    else:
+                        subtitle_parts.append("❌ Disabled")
+                    
+                    if vhost.get('filename'):
+                        subtitle_parts.append(vhost['filename'])
+                    
+                    vhost_row.set_subtitle(' • '.join(subtitle_parts))
+                    vhost_row.set_activatable(True)
+                    vhost_row.connect("activated", lambda r, s=service, v=vhost: self._show_vhost_detail(s, v))
+                    
+                    # Arrow icon to indicate clickable
+                    arrow = Gtk.Image.new_from_icon_name("go-next-symbolic")
+                    arrow.set_valign(Gtk.Align.CENTER)
+                    vhost_row.add_suffix(arrow)
+                    
+                    vhosts_group.add(vhost_row)
+        
+        except Exception as e:
+            logger.error(f"Error listing vhosts: {e}")
+        
+        main_box.append(vhosts_group)
+    
+    # ==================== APACHE HANDLERS ====================
+    
+    def _on_apache_switch_php(self, service, versions):
+        """Switch PHP version dialog"""
+        dialog = Adw.MessageDialog.new(self, _("Switch PHP Version"), None)
+        dialog.set_body(_("Select the PHP version to use with Apache"))
+        
+        # Create version selector
+        list_box = Gtk.ListBox()
+        list_box.set_selection_mode(Gtk.SelectionMode.SINGLE)
+        list_box.add_css_class("boxed-list")
+        
+        active_version = service.get_active_php_version()
+        selected_version = [active_version]  # Use list to allow modification in closure
+        
+        for version in versions:
+            row = Gtk.ListBoxRow()
+            box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+            box.set_spacing(12)
+            box.set_margin_top(8)
+            box.set_margin_bottom(8)
+            box.set_margin_start(12)
+            box.set_margin_end(12)
+            
+            label = Gtk.Label(label=f"PHP {version}")
+            label.set_hexpand(True)
+            label.set_halign(Gtk.Align.START)
+            box.append(label)
+            
+            if version == active_version:
+                check = Gtk.Image.new_from_icon_name("emblem-ok-symbolic")
+                box.append(check)
+            
+            row.set_child(box)
+            row.version = version
+            list_box.append(row)
+        
+        def on_row_activated(listbox, row):
+            selected_version[0] = row.version
+        
+        list_box.connect("row-activated", on_row_activated)
+        
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_child(list_box)
+        scrolled.set_min_content_height(200)
+        scrolled.set_margin_top(12)
+        
+        dialog.set_extra_child(scrolled)
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("switch", _("Switch"))
+        dialog.set_response_appearance("switch", Adw.ResponseAppearance.SUGGESTED)
+        
+        def on_response(dialog, response):
+            if response == "switch" and selected_version[0]:
+                success, message = service.switch_php_version(selected_version[0])
+                self._show_toast(message)
+                if success:
+                    dialog.close()
+                    if self.current_service and self.current_service.name == service.name:
+                        self._refresh_detail_page()
+        
+        dialog.connect("response", on_response)
+        dialog.present()
+    
+    def _on_apache_enable_ssl(self, service):
+        """Enable SSL module"""
+        dialog = Adw.MessageDialog.new(self)
+        dialog.set_heading(_("Enable SSL Module?"))
+        dialog.set_body(_("This will enable HTTPS support in Apache. The server will be restarted."))
+        
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("enable", _("Enable SSL"))
+        dialog.set_response_appearance("enable", Adw.ResponseAppearance.SUGGESTED)
+        
+        def on_response(dialog, response):
+            if response == "enable":
+                success, message = service.enable_ssl_module()
+                self._show_toast(message)
+                if success:
+                    dialog.close()
+                    if self.current_service and self.current_service.name == service.name:
+                        self._refresh_detail_page()
+        
+        dialog.connect("response", on_response)
+        dialog.present()
+    
+    def _on_apache_create_certificate(self, service):
+        """Create self-signed certificate dialog"""
+        dialog = Adw.MessageDialog.new(self, _("Create SSL Certificate"), None)
+        dialog.set_body(_("Enter the domain name for the certificate"))
+        
+        # Domain entry
+        entry_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        entry_box.set_spacing(8)
+        entry_box.set_margin_top(12)
+        
+        entry = Gtk.Entry()
+        entry.set_property("placeholder-text", "example.com")
+        entry_box.append(entry)
+        
+        info_label = Gtk.Label()
+        info_label.set_markup(f"<span size='small'>{_('A self-signed certificate will be created for development use.')}</span>")
+        info_label.set_wrap(True)
+        info_label.add_css_class("dim-label")
+        entry_box.append(info_label)
+        
+        dialog.set_extra_child(entry_box)
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("create", _("Create Certificate"))
+        dialog.set_response_appearance("create", Adw.ResponseAppearance.SUGGESTED)
+        
+        def on_response(dialog, response):
+            if response == "create":
+                domain = entry.get_text().strip()
+                if not domain:
+                    self._show_toast(_("Domain name cannot be empty"))
+                    return
+                
+                success, message, cert_info = service.create_self_signed_certificate(domain)
+                self._show_toast(message)
+                
+                if success:
+                    dialog.close()
+                    # Show certificate info
+                    info_dialog = Adw.MessageDialog.new(self)
+                    info_dialog.set_heading(_("Certificate Created"))
+                    info_dialog.set_body(
+                        _("Certificate: {cert}\nKey: {key}").format(
+                            cert=cert_info.get('cert_path', ''),
+                            key=cert_info.get('key_path', '')
+                        )
+                    )
+                    info_dialog.add_response("ok", _("OK"))
+                    info_dialog.present()
+        
+        dialog.connect("response", on_response)
+        dialog.present()
+    
+    def _on_apache_create_vhost(self, service):
+        """Create virtual host dialog"""
+        dialog = Adw.MessageDialog.new(self, _("Create Virtual Host"), None)
+        dialog.set_body(_("Configure the new virtual host"))
+        
+        # Create form
+        form_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        form_box.set_spacing(12)
+        form_box.set_margin_top(12)
+        
+        # Server name
+        servername_label = Gtk.Label(label=_("Server Name (domain):"))
+        servername_label.set_halign(Gtk.Align.START)
+        servername_entry = Gtk.Entry()
+        servername_entry.set_property("placeholder-text", "example.local")
+        
+        # Document root
+        docroot_label = Gtk.Label(label=_("Document Root:"))
+        docroot_label.set_halign(Gtk.Align.START)
+        docroot_entry = Gtk.Entry()
+        docroot_entry.set_property("placeholder-text", "/var/www/example.local")
+        
+        # Port
+        port_label = Gtk.Label(label=_("Port:"))
+        port_label.set_halign(Gtk.Align.START)
+        port_adjustment = Gtk.Adjustment(value=80, lower=1, upper=65535, step_increment=1)
+        port_spin = Gtk.SpinButton(adjustment=port_adjustment)
+        port_spin.set_digits(0)
+        
+        # SSL checkbox
+        ssl_check = Gtk.CheckButton(label=_("Enable SSL (HTTPS)"))
+        
+        # PHP version selector
+        php_label = Gtk.Label(label=_("PHP Version (optional):"))
+        php_label.set_halign(Gtk.Align.START)
+        
+        php_versions = service.get_installed_php_versions()
+        php_combo = Gtk.ComboBoxText()
+        php_combo.append("", _("None"))
+        for version in php_versions:
+            php_combo.append(version, f"PHP {version}")
+        php_combo.set_active(0)
+        
+        form_box.append(servername_label)
+        form_box.append(servername_entry)
+        form_box.append(docroot_label)
+        form_box.append(docroot_entry)
+        form_box.append(ssl_check)
+        form_box.append(php_label)
+        form_box.append(php_combo)
+        
+        dialog.set_extra_child(form_box)
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("create", _("Create"))
+        dialog.set_response_appearance("create", Adw.ResponseAppearance.SUGGESTED)
+        
+        def on_response(dialog, response):
+            if response == "create":
+                server_name = servername_entry.get_text().strip()
+                document_root = docroot_entry.get_text().strip()
+                ssl = ssl_check.get_active()
+                php_version = php_combo.get_active_id()
+                
+                if not server_name:
+                    self._show_toast(_("Server name cannot be empty"))
+                    return
+                
+                if not document_root:
+                    document_root = f"/var/www/{server_name}"
+                
+                success, message = service.create_vhost(
+                    server_name=server_name,
+                    document_root=document_root,
+                    ssl=ssl,
+                    php_version=php_version if php_version else None
+                )
+                
+                self._show_toast(message)
+                
+                if success:
+                    dialog.close()
+                    if self.current_service and self.current_service.name == service.name:
+                        self._refresh_detail_page()
+        
+        dialog.connect("response", on_response)
+        dialog.present()
+    
+    def _on_apache_toggle_vhost(self, service, vhost, enabled):
+        """Toggle virtual host enabled state"""
+        if enabled:
+            success, message = service.enable_vhost(vhost['filename'])
+        else:
+            success, message = service.disable_vhost(vhost['filename'])
+        
+        self._show_toast(message)
+        if not success:
+            # Revert switch state if failed
+            self._show_service_detail(service)
+    
+    def _on_apache_delete_vhost(self, service, vhost):
+        """Delete virtual host"""
+        dialog = Adw.MessageDialog.new(self)
+        dialog.set_heading(_("Delete Virtual Host?"))
+        dialog.set_body(_("Are you sure you want to delete '{name}'? This action cannot be undone.").format(
+            name=vhost['server_name']
+        ))
+        
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("delete", _("Delete"))
+        dialog.set_response_appearance("delete", Adw.ResponseAppearance.DESTRUCTIVE)
+        
+        def on_response(dialog, response):
+            if response == "delete":
+                success, message = service.delete_vhost(vhost['filename'])
+                self._show_toast(message)
+                if success:
+                    dialog.close()
+                    if self.current_service and self.current_service.name == service.name:
+                        self._refresh_detail_page()
+        
+        dialog.connect("response", on_response)
+        dialog.present()
+    
+    def _show_vhost_detail(self, service, vhost):
+        """Show virtual host detail page"""
+        # Get detailed information if not already loaded
+        if 'server_name' not in vhost or 'document_root' not in vhost:
+            filename = vhost.get('filename', '')
+            if not filename:
+                self._show_toast(_("Invalid virtual host data"))
+                return
+            details = service.get_vhost_details(filename)
+            if not details:
+                self._show_toast(_("Could not load virtual host details"))
+                return
+        else:
+            details = vhost
+        
+        # Create detail dialog
+        dialog = Adw.Dialog()
+        dialog.set_title(details['server_name'])
+        
+        # Main content
+        toolbar_view = Adw.ToolbarView()
+        
+        # Header bar
+        header = Adw.HeaderBar()
+        header.set_show_title(True)
+        toolbar_view.add_top_bar(header)
+        
+        # Scrolled content
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_vexpand(True)
+        scrolled.set_hexpand(True)
+        scrolled.set_min_content_width(500)
+        scrolled.set_min_content_height(600)
+        
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        content_box.set_spacing(24)
+        content_box.set_margin_top(24)
+        content_box.set_margin_bottom(24)
+        content_box.set_margin_start(24)
+        content_box.set_margin_end(24)
+        
+        # Site Information
+        info_group = Adw.PreferencesGroup()
+        info_group.set_title(_("Site Information"))
+        
+        # Server name
+        name_row = Adw.ActionRow()
+        name_row.set_title(_("Server Name"))
+        name_label = Gtk.Label(label=details['server_name'])
+        name_label.set_selectable(True)
+        name_row.add_suffix(name_label)
+        info_group.add(name_row)
+        
+        # Document root
+        docroot_row = Adw.ActionRow()
+        docroot_row.set_title(_("Document Root"))
+        docroot_label = Gtk.Label(label=details['document_root'] or "N/A")
+        docroot_label.set_selectable(True)
+        docroot_row.add_suffix(docroot_label)
+        info_group.add(docroot_row)
+        
+        # SSL status
+        ssl_row = Adw.ActionRow()
+        ssl_row.set_title(_("SSL/HTTPS"))
+        if details['ssl_enabled']:
+            ssl_label = Gtk.Label(label="✅ Enabled")
+            ssl_label.add_css_class("success")
+        else:
+            ssl_label = Gtk.Label(label="❌ Disabled")
+        ssl_row.add_suffix(ssl_label)
+        info_group.add(ssl_row)
+        
+        # PHP version
+        php_row = Adw.ActionRow()
+        php_row.set_title(_("PHP Version"))
+        if details['php_version']:
+            php_label = Gtk.Label(label=f"PHP {details['php_version']}")
+        else:
+            php_label = Gtk.Label(label=_("Not configured"))
+        php_row.add_suffix(php_label)
+        info_group.add(php_row)
+        
+        content_box.append(info_group)
+        
+        # PHP Management
+        php_group = Adw.PreferencesGroup()
+        php_group.set_title(_("PHP Configuration"))
+        
+        php_versions = service.get_installed_php_versions()
+        if php_versions:
+            # Change PHP version
+            change_php_row = Adw.ActionRow()
+            change_php_row.set_title(_("Change PHP Version"))
+            change_php_row.set_subtitle(_("Switch to a different PHP version"))
+            change_php_row.set_activatable(True)
+            change_php_row.connect("activated", lambda r: self._on_vhost_change_php(service, details, php_versions, dialog))
+            change_php_icon = Gtk.Image.new_from_icon_name("emblem-synchronizing-symbolic")
+            change_php_row.add_prefix(change_php_icon)
+            php_group.add(change_php_row)
+        
+        content_box.append(php_group)
+        
+        # Actions
+        actions_group = Adw.PreferencesGroup()
+        actions_group.set_title(_("Actions"))
+        
+        # Enable/Disable
+        os_type = service.platform_manager.os_type.value
+        if os_type in ['ubuntu', 'debian']:
+            if details['enabled']:
+                disable_row = Adw.ActionRow()
+                disable_row.set_title(_("Disable Site"))
+                disable_row.set_subtitle(_("Temporarily disable this virtual host"))
+                disable_row.set_activatable(True)
+                disable_row.connect("activated", lambda r: self._on_vhost_disable(service, details, dialog))
+                disable_icon = Gtk.Image.new_from_icon_name("media-playback-pause-symbolic")
+                disable_row.add_prefix(disable_icon)
+                actions_group.add(disable_row)
+            else:
+                enable_row = Adw.ActionRow()
+                enable_row.set_title(_("Enable Site"))
+                enable_row.set_subtitle(_("Enable this virtual host"))
+                enable_row.set_activatable(True)
+                enable_row.connect("activated", lambda r: self._on_vhost_enable(service, details, dialog))
+                enable_icon = Gtk.Image.new_from_icon_name("media-playback-start-symbolic")
+                enable_row.add_prefix(enable_icon)
+                actions_group.add(enable_row)
+        
+        # Open in browser
+        browse_row = Adw.ActionRow()
+        browse_row.set_title(_("Open in Browser"))
+        browse_row.set_subtitle(f"http://{details['server_name']}/")
+        browse_row.set_activatable(True)
+        browse_row.connect("activated", lambda r: self._on_vhost_open_browser(details))
+        browse_icon = Gtk.Image.new_from_icon_name("web-browser-symbolic")
+        browse_row.add_prefix(browse_icon)
+        actions_group.add(browse_row)
+        
+        # Delete
+        delete_row = Adw.ActionRow()
+        delete_row.set_title(_("Delete Virtual Host"))
+        delete_row.set_subtitle(_("Permanently remove this site"))
+        delete_row.set_activatable(True)
+        delete_row.connect("activated", lambda r: self._on_vhost_delete_confirm(service, details, dialog))
+        delete_icon = Gtk.Image.new_from_icon_name("user-trash-symbolic")
+        delete_row.add_prefix(delete_icon)
+        actions_group.add(delete_row)
+        
+        content_box.append(actions_group)
+        
+        scrolled.set_child(content_box)
+        toolbar_view.set_content(scrolled)
+        dialog.set_child(toolbar_view)
+        dialog.present(self)
+    
+    def _on_vhost_change_php(self, service, details, versions, parent_dialog):
+        """Change PHP version for vhost"""
+        dialog = Adw.MessageDialog.new(parent_dialog, _("Change PHP Version"), None)
+        dialog.set_body(_("Select the PHP version for {name}").format(name=details['server_name']))
+        
+        # Version selector
+        list_box = Gtk.ListBox()
+        list_box.set_selection_mode(Gtk.SelectionMode.SINGLE)
+        list_box.add_css_class("boxed-list")
+        
+        selected_version = [details['php_version']]
+        
+        for version in versions:
+            row = Gtk.ListBoxRow()
+            box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+            box.set_spacing(12)
+            box.set_margin_top(8)
+            box.set_margin_bottom(8)
+            box.set_margin_start(12)
+            box.set_margin_end(12)
+            
+            label = Gtk.Label(label=f"PHP {version}")
+            label.set_hexpand(True)
+            label.set_halign(Gtk.Align.START)
+            box.append(label)
+            
+            if version == details['php_version']:
+                check = Gtk.Image.new_from_icon_name("emblem-ok-symbolic")
+                box.append(check)
+            
+            row.set_child(box)
+            row.version = version
+            list_box.append(row)
+        
+        def on_row_activated(listbox, row):
+            selected_version[0] = row.version
+        
+        list_box.connect("row-activated", on_row_activated)
+        
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_child(list_box)
+        scrolled.set_min_content_height(200)
+        scrolled.set_margin_top(12)
+        
+        dialog.set_extra_child(scrolled)
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("change", _("Change"))
+        dialog.set_response_appearance("change", Adw.ResponseAppearance.SUGGESTED)
+        
+        def on_response(dialog, response):
+            if response == "change" and selected_version[0]:
+                success, message = service.update_vhost_php_version(details['filename'], selected_version[0])
+                self._show_toast(message)
+                if success:
+                    dialog.close()
+                    parent_dialog.close()
+                    if self.current_service and self.current_service.name == service.name:
+                        self._refresh_detail_page()
+        
+        dialog.connect("response", on_response)
+        dialog.present()
+    
+    def _on_vhost_enable(self, service, details, parent_dialog):
+        """Enable virtual host"""
+        success, message = service.enable_vhost(details['filename'])
+        self._show_toast(message)
+        if success:
+            parent_dialog.close()
+            if self.current_service and self.current_service.name == service.name:
+                self._refresh_detail_page()
+    
+    def _on_vhost_disable(self, service, details, parent_dialog):
+        """Disable virtual host"""
+        success, message = service.disable_vhost(details['filename'])
+        self._show_toast(message)
+        if success:
+            parent_dialog.close()
+            if self.current_service and self.current_service.name == service.name:
+                self._refresh_detail_page()
+    
+    def _on_vhost_open_browser(self, details):
+        """Open virtual host in browser"""
+        import subprocess
+        url = f"http://{details['server_name']}/"
+        try:
+            subprocess.Popen(['xdg-open', url])
+        except Exception as e:
+            logger.error(f"Error opening browser: {e}")
+            self._show_toast(_("Could not open browser"))
+    
+    def _on_vhost_delete_confirm(self, service, details, parent_dialog):
+        """Confirm and delete virtual host"""
+        dialog = Adw.MessageDialog.new(parent_dialog)
+        dialog.set_heading(_("Delete {name}?").format(name=details['server_name']))
+        dialog.set_body(_("This will permanently delete the virtual host configuration. The document root files will not be deleted."))
+        
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("delete", _("Delete"))
+        dialog.set_response_appearance("delete", Adw.ResponseAppearance.DESTRUCTIVE)
+        
+        def on_response(dialog, response):
+            if response == "delete":
+                success, message = service.delete_vhost(details['filename'])
+                self._show_toast(message)
+                if success:
+                    dialog.close()
+                    parent_dialog.close()
+                    if self.current_service and self.current_service.name == service.name:
+                        self._refresh_detail_page()
         
         dialog.connect("response", on_response)
         dialog.present()
