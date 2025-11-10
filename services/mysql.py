@@ -265,12 +265,11 @@ class MySQLService(BaseService):
                 status_data['auth_method'] = 'Unix Socket (sudo mysql)'
                 status_data['root_access'] = True  # Assume sudo works
             
-            # Add databases count and user count - sadece sudo ile değil, güvenli şekilde
+            # Database ve user bilgilerini al (saved password var mı kontrol et)
             if self.is_running():
-                # Eğer SUDO_ASKPASS set edilmişse, güvenle database listesini al
-                import os
-                if saved_password or os.environ.get('SUDO_ASKPASS'):
-                    db_success, databases = self.get_databases()
+                if saved_password:
+                    # Saved password ile bilgileri al
+                    db_success, databases = self.get_databases(saved_password)
                     if db_success:
                         status_data['databases_count'] = len(databases)
                         status_data['databases'] = databases
@@ -278,7 +277,6 @@ class MySQLService(BaseService):
                         status_data['databases_count'] = 0
                         status_data['databases'] = []
                     
-                    # Get users count
                     users_success, users = self.get_users()
                     if users_success:
                         status_data['users_count'] = len(users)
@@ -287,11 +285,31 @@ class MySQLService(BaseService):
                         status_data['users_count'] = 0
                         status_data['users'] = []
                 else:
-                    # Sudo password gerekli, boş değerler dön
-                    status_data['databases_count'] = 0
-                    status_data['databases'] = []
-                    status_data['users_count'] = 0
-                    status_data['users'] = []
+                    # Sudo cache kontrol et
+                    import subprocess
+                    try:
+                        result = subprocess.run(['sudo', '-n', 'true'], capture_output=True, timeout=2)
+                        if result.returncode == 0:
+                            # Sudo cache'de var, bilgileri al
+                            db_success, databases = self.get_databases()
+                            status_data['databases_count'] = len(databases) if db_success else 0
+                            status_data['databases'] = databases if db_success else []
+                            
+                            users_success, users = self.get_users()
+                            status_data['users_count'] = len(users) if users_success else 0
+                            status_data['users'] = users if users_success else []
+                        else:
+                            # Sudo cache yok, boş değerler
+                            status_data['databases_count'] = 0
+                            status_data['databases'] = []
+                            status_data['users_count'] = 0
+                            status_data['users'] = []
+                    except:
+                        # Sudo kontrol başarısız
+                        status_data['databases_count'] = 0
+                        status_data['databases'] = []
+                        status_data['users_count'] = 0
+                        status_data['users'] = []
             else:
                 status_data['databases_count'] = 0
                 status_data['databases'] = []

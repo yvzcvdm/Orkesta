@@ -25,8 +25,8 @@ class OrkestaApp(Adw.Application):
     def __init__(self):
         from gi.repository import Gio
         super().__init__(
-            application_id='com.orkesta.Orkesta',
-            flags=Gio.ApplicationFlags.DEFAULT_FLAGS
+            application_id='com.github.orkesta.App',
+            flags=Gio.ApplicationFlags.FLAGS_NONE
         )
         self.platform_manager = None
         self.service_loader = None
@@ -36,9 +36,6 @@ class OrkestaApp(Adw.Application):
         """Uygulama aktive edildiğinde çağrılır"""
         try:
             if not self.main_window:
-                # İlk önce sudo şifresi iste
-                self._request_sudo_password()
-                
                 # Platform yöneticisini başlat
                 self.platform_manager = PlatformManager()
                 
@@ -54,107 +51,48 @@ class OrkestaApp(Adw.Application):
                 )
             
             self.main_window.present()
+            
+            # Sudo cache'i arka planda başlat (UI gösterildikten sonra)
+            from gi.repository import GLib
+            GLib.timeout_add(100, self._initialize_sudo_cache)
+            
         except Exception as e:
             print(f"❌ Hata: {e}")
             import traceback
             traceback.print_exc()
             sys.exit(1)
     
-    def _request_sudo_password(self):
-        """Uygulama başlangıcında sudo şifresi iste"""
+    def _initialize_sudo_cache(self):
+        """Sudo cache'i başlat - sistem dialog ile"""
         import subprocess
-        import os
-        from gi.repository import Gtk, Adw, GLib
         
-        # Sudo gerekip gerekmediğini kontrol et
         try:
-            # Test sudo access
+            # Sudo cache'de var mı kontrol et
             result = subprocess.run(['sudo', '-n', 'true'], capture_output=True, timeout=1)
             if result.returncode == 0:
-                # Sudo cache'de var, şifre istemeye gerek yok
-                return
+                # Zaten cache'de var
+                print("✅ Sudo zaten yetkilendirilmiş")
+                return False
         except:
             pass
         
-        # Sudo şifresi dialog'u
-        dialog = Adw.MessageDialog.new(None)
-        dialog.set_heading(_("Administrator Access Required"))
-        dialog.set_body(_("Orkesta needs administrator privileges for system operations. Please enter your password."))
-        
-        dialog.add_response("cancel", _("Cancel"))
-        dialog.add_response("ok", _("OK"))
-        dialog.set_response_appearance("ok", Adw.ResponseAppearance.SUGGESTED)
-        dialog.set_default_response("ok")
-        
-        # Password entry
-        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        content_box.set_spacing(12)
-        content_box.set_margin_top(12)
-        content_box.set_margin_bottom(12)
-        content_box.set_margin_start(12)
-        content_box.set_margin_end(12)
-        
-        password_entry = Adw.PasswordEntryRow()
-        password_entry.set_title(_("Password"))
-        password_entry.set_show_apply_button(False)
-        
-        content_box.append(password_entry)
-        dialog.set_extra_child(content_box)
-        
-        password_accepted = False
-        
-        def on_response(dialog, response):
-            nonlocal password_accepted
-            if response == "ok":
-                password = password_entry.get_text()
-                if password:
-                    # Test password
-                    try:
-                        result = subprocess.run(
-                            ['sudo', '-S', 'true'], 
-                            input=password + '\n', 
-                            text=True,
-                            capture_output=True,
-                            timeout=5
-                        )
-                        if result.returncode == 0:
-                            password_accepted = True
-                            dialog.close()
-                            return
-                        else:
-                            # Wrong password
-                            password_entry.set_text("")
-                            password_entry.add_css_class("error")
-                            GLib.timeout_add(2000, lambda: password_entry.remove_css_class("error"))
-                            return
-                    except Exception as e:
-                        print(f"Sudo test error: {e}")
-                        
-                # Empty or wrong password
-                if not password:
-                    password_entry.add_css_class("error")
-                    GLib.timeout_add(1000, lambda: password_entry.remove_css_class("error"))
+        # Cache'de yok, pkexec veya sudo ile şifre iste
+        try:
+            # pkexec kullan (GUI dialog)
+            result = subprocess.run(['pkexec', 'true'], capture_output=True, timeout=30)
+            if result.returncode == 0:
+                print("✅ Sudo yetkilendirmesi başarılı")
             else:
-                # Cancel
-                dialog.close()
-                sys.exit(0)
+                print("⚠️ Sudo yetkilendirmesi iptal edildi veya başarısız")
+        except:
+            try:
+                # Fallback: sudo ile (terminal'de çalışırsa)
+                subprocess.run(['sudo', 'true'], timeout=30, check=True)
+                print("✅ Sudo yetkilendirmesi başarılı")
+            except:
+                print("⚠️ Sudo yetkilendirmesi yapılamadı")
         
-        dialog.connect("response", on_response)
-        
-        # Enter key activation
-        def on_entry_activate(entry):
-            dialog.response("ok")
-        
-        password_entry.connect("entry-activated", on_entry_activate)
-        
-        dialog.present()
-        password_entry.grab_focus()
-        
-        # Wait for dialog to close
-        from gi.repository import GLib
-        main_context = GLib.MainContext.default()
-        while not password_accepted and dialog.get_visible():
-            main_context.iteration(False)
+        return False  # Don't repeat timeout
     
     def do_shutdown(self):
         """Uygulama kapanırken çağrılır"""

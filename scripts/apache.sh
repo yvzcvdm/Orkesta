@@ -718,9 +718,15 @@ action_vhost_details() {
     local server_name=$(grep -m1 "ServerName" "$config_file" | awk '{print $2}')
     local document_root=$(grep -m1 "DocumentRoot" "$config_file" | awk '{print $2}')
     local ssl_enabled=false
+    local php_version=""
     
     if grep -q "SSLEngine on" "$config_file"; then
         ssl_enabled=true
+    fi
+    
+    # Extract PHP version from config
+    if grep -q "php.*fpm" "$config_file"; then
+        php_version=$(grep -oP 'php\K[0-9]+\.[0-9]+' "$config_file" | head -n1)
     fi
     
     local enabled=true
@@ -732,12 +738,13 @@ action_vhost_details() {
     fi
     
     if [ "$json_output" = true ]; then
-        echo "{\"filename\":\"$filename\",\"server_name\":\"$server_name\",\"document_root\":\"$document_root\",\"ssl\":$ssl_enabled,\"enabled\":$enabled}"
+        echo "{\"filename\":\"$filename\",\"server_name\":\"$server_name\",\"document_root\":\"$document_root\",\"ssl\":$ssl_enabled,\"php_version\":\"$php_version\",\"enabled\":$enabled}"
     else
         echo "Filename: $filename"
         echo "Server Name: $server_name"
         echo "Document Root: $document_root"
         echo "SSL: $ssl_enabled"
+        echo "PHP Version: $php_version"
         echo "Enabled: $enabled"
     fi
     
@@ -748,8 +755,8 @@ action_vhost_update_php() {
     local filename="$1"
     local php_version="$2"
     
-    if [ -z "$filename" ] || [ -z "$php_version" ]; then
-        echo "ERROR: filename and php_version are required"
+    if [ -z "$filename" ]; then
+        echo "ERROR: filename is required"
         exit 1
     fi
     
@@ -765,16 +772,22 @@ action_vhost_update_php() {
     sed -i '/# PHP-FPM Configuration/,/SetHandler.*php.*fpm/d' "$config_file"
     sed -i '/<FilesMatch.*php/,/<\/FilesMatch>/d' "$config_file"
     
-    # Add new PHP-FPM configuration before </VirtualHost>
-    local php_config="    # PHP-FPM Configuration\n    <FilesMatch \.php$>\n        SetHandler \"proxy:unix:/run/php/php${php_version}-fpm.sock|fcgi://localhost\"\n    </FilesMatch>"
-    
-    sed -i "s|</VirtualHost>|$php_config\n</VirtualHost>|" "$config_file"
+    # If php_version is provided and not empty, add new configuration
+    if [ -n "$php_version" ]; then
+        # Add new PHP-FPM configuration before </VirtualHost>
+        local php_config="    # PHP-FPM Configuration\n    <FilesMatch \.php$>\n        SetHandler \"proxy:unix:/run/php/php${php_version}-fpm.sock|fcgi://localhost\"\n    </FilesMatch>"
+        
+        sed -i "s|</VirtualHost>|$php_config\n</VirtualHost>|" "$config_file"
+        
+        echo "PHP version updated to $php_version for $filename"
+    else
+        echo "PHP configuration removed from $filename"
+    fi
     
     # Reload Apache
     local service_name=$(get_service_name)
     systemctl reload "$service_name" 2>&1
     
-    echo "PHP version updated to $php_version for $filename"
     exit 0
 }
 

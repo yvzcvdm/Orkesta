@@ -652,8 +652,6 @@ class MainWindow(Adw.ApplicationWindow):
         logger.info(f"Toast: {message}")
         print(f"📢 {message}")
     
-
-    
     # ==================== NAVIGATION ====================
     
     def _on_service_row_activated(self, listbox, row):
@@ -1755,91 +1753,219 @@ class MainWindow(Adw.ApplicationWindow):
         dialog.present()
     
     def _on_apache_create_vhost(self, service):
-        """Create virtual host dialog"""
-        dialog = Adw.MessageDialog.new(self, _("Create Virtual Host"), None)
-        dialog.set_body(_("Configure the new virtual host"))
+        """Create virtual host dialog with comprehensive settings"""
+        # Create a full dialog with better layout
+        dialog = Adw.Dialog()
+        dialog.set_title(_("Create Virtual Host"))
         
-        # Create form
-        form_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        form_box.set_spacing(12)
-        form_box.set_margin_top(12)
+        # Create toolbar view
+        toolbar_view = Adw.ToolbarView()
         
-        # Server name
-        servername_label = Gtk.Label(label=_("Server Name (domain):"))
-        servername_label.set_halign(Gtk.Align.START)
-        servername_entry = Gtk.Entry()
-        servername_entry.set_property("placeholder-text", "example.local")
+        # Header bar with cancel and create buttons
+        header = Adw.HeaderBar()
         
-        # Document root
-        docroot_label = Gtk.Label(label=_("Document Root:"))
-        docroot_label.set_halign(Gtk.Align.START)
+        cancel_button = Gtk.Button(label=_("Cancel"))
+        cancel_button.connect("clicked", lambda b: dialog.close())
+        header.pack_start(cancel_button)
+        
+        create_button = Gtk.Button(label=_("Create"))
+        create_button.add_css_class("suggested-action")
+        header.pack_end(create_button)
+        
+        toolbar_view.add_top_bar(header)
+        
+        # Main content
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_vexpand(True)
+        scrolled.set_hexpand(True)
+        scrolled.set_min_content_width(500)
+        scrolled.set_min_content_height(500)
+        
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        content_box.set_spacing(24)
+        content_box.set_margin_top(24)
+        content_box.set_margin_bottom(24)
+        content_box.set_margin_start(24)
+        content_box.set_margin_end(24)
+        
+        # Basic Settings Group
+        basic_group = Adw.PreferencesGroup()
+        basic_group.set_title(_("Basic Settings"))
+        basic_group.set_description(_("Configure domain name and document root"))
+        
+        # Server name entry row
+        servername_row = Adw.EntryRow()
+        servername_row.set_title(_("Server Name (Domain)"))
+        servername_row.set_text("")
+        servername_row.set_show_apply_button(False)
+        basic_group.add(servername_row)
+        
+        # Document root with file chooser
+        docroot_row = Adw.ActionRow()
+        docroot_row.set_title(_("Document Root"))
+        docroot_row.set_subtitle(_("Location of website files"))
+        
+        docroot_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        docroot_box.set_spacing(6)
+        docroot_box.set_valign(Gtk.Align.CENTER)
+        
         docroot_entry = Gtk.Entry()
-        docroot_entry.set_property("placeholder-text", "/var/www/example.local")
+        docroot_entry.set_placeholder_text("/var/www/example.local")
+        docroot_entry.set_hexpand(True)
+        docroot_box.append(docroot_entry)
         
-        # Port
-        port_label = Gtk.Label(label=_("Port:"))
-        port_label.set_halign(Gtk.Align.START)
-        port_adjustment = Gtk.Adjustment(value=80, lower=1, upper=65535, step_increment=1)
-        port_spin = Gtk.SpinButton(adjustment=port_adjustment)
-        port_spin.set_digits(0)
+        browse_button = Gtk.Button()
+        browse_button.set_icon_name("document-open-symbolic")
+        browse_button.set_tooltip_text(_("Browse"))
         
-        # SSL checkbox
-        ssl_check = Gtk.CheckButton(label=_("Enable SSL (HTTPS)"))
+        def on_browse_clicked(button):
+            file_dialog = Gtk.FileDialog()
+            file_dialog.set_title(_("Select Document Root"))
+            file_dialog.select_folder(None, None, lambda d, res: self._on_folder_selected(d, res, docroot_entry))
+        
+        browse_button.connect("clicked", on_browse_clicked)
+        docroot_box.append(browse_button)
+        
+        docroot_row.add_suffix(docroot_box)
+        basic_group.add(docroot_row)
+        
+        content_box.append(basic_group)
+        
+        # PHP Settings Group
+        php_group = Adw.PreferencesGroup()
+        php_group.set_title(_("PHP Configuration"))
+        php_group.set_description(_("Select PHP version for this virtual host"))
         
         # PHP version selector
-        php_label = Gtk.Label(label=_("PHP Version (optional):"))
-        php_label.set_halign(Gtk.Align.START)
-        
         php_versions = service.get_installed_php_versions()
-        php_combo = Gtk.ComboBoxText()
-        php_combo.append("", _("None"))
+        php_row = Adw.ComboRow()
+        php_row.set_title(_("PHP Version"))
+        php_row.set_subtitle(_("Leave as 'None' if not using PHP"))
+        
+        php_model = Gtk.StringList()
+        php_model.append(_("None"))
+        php_versions_list = [None]
+        
         for version in php_versions:
-            php_combo.append(version, f"PHP {version}")
-        php_combo.set_active(0)
+            php_model.append(f"PHP {version}")
+            php_versions_list.append(version)
         
-        form_box.append(servername_label)
-        form_box.append(servername_entry)
-        form_box.append(docroot_label)
-        form_box.append(docroot_entry)
-        form_box.append(ssl_check)
-        form_box.append(php_label)
-        form_box.append(php_combo)
+        php_row.set_model(php_model)
+        php_row.set_selected(0)
+        php_group.add(php_row)
         
-        dialog.set_extra_child(form_box)
-        dialog.add_response("cancel", _("Cancel"))
-        dialog.add_response("create", _("Create"))
-        dialog.set_response_appearance("create", Adw.ResponseAppearance.SUGGESTED)
+        content_box.append(php_group)
         
-        def on_response(dialog, response):
-            if response == "create":
-                server_name = servername_entry.get_text().strip()
-                document_root = docroot_entry.get_text().strip()
-                ssl = ssl_check.get_active()
-                php_version = php_combo.get_active_id()
-                
-                if not server_name:
-                    self._show_toast(_("Server name cannot be empty"))
-                    return
-                
-                if not document_root:
-                    document_root = f"/var/www/{server_name}"
-                
-                success, message = service.create_vhost(
-                    server_name=server_name,
-                    document_root=document_root,
-                    ssl=ssl,
-                    php_version=php_version if php_version else None
-                )
-                
-                self._show_toast(message)
-                
-                if success:
-                    dialog.close()
-                    if self.current_service and self.current_service.name == service.name:
-                        self._refresh_detail_page()
+        # SSL/HTTPS Settings Group
+        ssl_group = Adw.PreferencesGroup()
+        ssl_group.set_title(_("SSL/HTTPS Configuration"))
+        ssl_group.set_description(_("Enable HTTPS with automatic certificate generation"))
         
-        dialog.connect("response", on_response)
-        dialog.present()
+        # SSL enable switch
+        ssl_row = Adw.SwitchRow()
+        ssl_row.set_title(_("Enable SSL/HTTPS"))
+        ssl_row.set_subtitle(_("Listen on port 443 with automatic self-signed certificate"))
+        ssl_row.set_active(False)
+        ssl_group.add(ssl_row)
+        
+        # SSL info when enabled
+        ssl_info_row = Adw.ActionRow()
+        ssl_info_row.set_title(_("Certificate Generation"))
+        ssl_info_row.set_subtitle(_("A self-signed certificate will be automatically created and configured"))
+        ssl_info_icon = Gtk.Image.new_from_icon_name("dialog-information-symbolic")
+        ssl_info_row.add_prefix(ssl_info_icon)
+        ssl_info_row.set_visible(False)
+        ssl_group.add(ssl_info_row)
+        
+        def on_ssl_toggled(switch, *args):
+            ssl_info_row.set_visible(switch.get_active())
+        
+        ssl_row.connect("notify::active", on_ssl_toggled)
+        
+        content_box.append(ssl_group)
+        
+        scrolled.set_child(content_box)
+        toolbar_view.set_content(scrolled)
+        dialog.set_child(toolbar_view)
+        
+        # Create button handler
+        def on_create_clicked(button):
+            server_name = servername_row.get_text().strip()
+            document_root = docroot_entry.get_text().strip()
+            ssl_enabled = ssl_row.get_active()
+            php_selected = php_row.get_selected()
+            php_version = php_versions_list[php_selected] if php_selected > 0 else None
+            
+            # Debug logging
+            logger.info(f"Creating vhost - Server name: '{server_name}', Document root: '{document_root}'")
+            
+            # Validation
+            if not server_name:
+                self._show_toast(_("Server name cannot be empty"))
+                return
+            
+            # Auto-generate document root if empty
+            if not document_root:
+                document_root = f"/var/www/{server_name}"
+                docroot_entry.set_text(document_root)
+            
+            logger.info(f"Final values - Server name: '{server_name}', Document root: '{document_root}'")
+            
+            # Show progress
+            self._show_toast(_("Creating virtual host..."))
+            
+            # Create vhost with all settings
+            success, message = service.create_vhost(
+                server_name=server_name,
+                document_root=document_root,
+                ssl=ssl_enabled,
+                php_version=php_version
+            )
+            
+            self._show_toast(message)
+            
+            if success:
+                dialog.close()
+                if self.current_service and self.current_service.name == service.name:
+                    self._refresh_detail_page()
+        
+        create_button.connect("clicked", on_create_clicked)
+        
+        # Auto-fill document root when server name changes (with debounce)
+        auto_fill_timeout = [None]  # Use list to allow modification in closure
+        
+        def on_servername_changed(entry):
+            # Cancel previous timeout
+            if auto_fill_timeout[0]:
+                GLib.source_remove(auto_fill_timeout[0])
+                auto_fill_timeout[0] = None
+            
+            # Set new timeout (500ms delay)
+            def do_auto_fill():
+                server_name = entry.get_text().strip()
+                if server_name and not docroot_entry.get_text().strip():
+                    new_path = f"/var/www/{server_name}"
+                    logger.info(f"Auto-filling document root: '{server_name}' -> '{new_path}'")
+                    docroot_entry.set_text(new_path)
+                auto_fill_timeout[0] = None
+                return False  # Don't repeat
+            
+            auto_fill_timeout[0] = GLib.timeout_add(500, do_auto_fill)
+        
+        servername_row.connect("changed", on_servername_changed)
+        
+        dialog.present(self)
+    
+    def _on_folder_selected(self, file_dialog, result, entry):
+        """Handle folder selection for document root"""
+        try:
+            folder = file_dialog.select_folder_finish(result)
+            if folder:
+                path = folder.get_path()
+                if path:
+                    entry.set_text(path)
+        except Exception as e:
+            logger.error(f"Error selecting folder: {e}")
     
     def _on_apache_toggle_vhost(self, service, vhost, enabled):
         """Toggle virtual host enabled state"""
@@ -1941,7 +2067,7 @@ class MainWindow(Adw.ApplicationWindow):
         # SSL status
         ssl_row = Adw.ActionRow()
         ssl_row.set_title(_("SSL/HTTPS"))
-        if details['ssl_enabled']:
+        if details.get('ssl', False) or details.get('ssl_enabled', False):
             ssl_label = Gtk.Label(label="✅ Enabled")
             ssl_label.add_css_class("success")
         else:
@@ -1952,8 +2078,9 @@ class MainWindow(Adw.ApplicationWindow):
         # PHP version
         php_row = Adw.ActionRow()
         php_row.set_title(_("PHP Version"))
-        if details['php_version']:
-            php_label = Gtk.Label(label=f"PHP {details['php_version']}")
+        php_version = details.get('php_version', '')
+        if php_version:
+            php_label = Gtk.Label(label=f"PHP {php_version}")
         else:
             php_label = Gtk.Label(label=_("Not configured"))
         php_row.add_suffix(php_label)
@@ -1982,6 +2109,16 @@ class MainWindow(Adw.ApplicationWindow):
         # Actions
         actions_group = Adw.PreferencesGroup()
         actions_group.set_title(_("Actions"))
+        
+        # Edit virtual host
+        edit_row = Adw.ActionRow()
+        edit_row.set_title(_("Edit Virtual Host"))
+        edit_row.set_subtitle(_("Modify domain, document root, PHP and SSL settings"))
+        edit_row.set_activatable(True)
+        edit_row.connect("activated", lambda r: self._on_vhost_edit(service, details, dialog))
+        edit_icon = Gtk.Image.new_from_icon_name("document-edit-symbolic")
+        edit_row.add_prefix(edit_icon)
+        actions_group.add(edit_row)
         
         # Enable/Disable
         os_type = service.platform_manager.os_type.value
@@ -2121,6 +2258,146 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception as e:
             logger.error(f"Error opening browser: {e}")
             self._show_toast(_("Could not open browser"))
+    
+    def _on_vhost_edit(self, service, details, parent_dialog):
+        """Edit virtual host configuration"""
+        # Create edit dialog
+        dialog = Adw.Dialog()
+        dialog.set_title(_("Edit Virtual Host: {name}").format(name=details['server_name']))
+        
+        # Create toolbar view
+        toolbar_view = Adw.ToolbarView()
+        
+        # Header bar with cancel and save buttons
+        header = Adw.HeaderBar()
+        
+        cancel_button = Gtk.Button(label=_("Cancel"))
+        cancel_button.connect("clicked", lambda b: dialog.close())
+        header.pack_start(cancel_button)
+        
+        save_button = Gtk.Button(label=_("Save"))
+        save_button.add_css_class("suggested-action")
+        header.pack_end(save_button)
+        
+        toolbar_view.add_top_bar(header)
+        
+        # Main content
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_vexpand(True)
+        scrolled.set_hexpand(True)
+        scrolled.set_min_content_width(500)
+        scrolled.set_min_content_height(500)
+        
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        content_box.set_spacing(24)
+        content_box.set_margin_top(24)
+        content_box.set_margin_bottom(24)
+        content_box.set_margin_start(24)
+        content_box.set_margin_end(24)
+        
+        # Basic Settings Group (Read-only for now)
+        basic_group = Adw.PreferencesGroup()
+        basic_group.set_title(_("Basic Settings"))
+        basic_group.set_description(_("Domain and document root (read-only)"))
+        
+        # Server name (read-only)
+        servername_row = Adw.ActionRow()
+        servername_row.set_title(_("Server Name"))
+        servername_label = Gtk.Label(label=details['server_name'])
+        servername_label.set_selectable(True)
+        servername_row.add_suffix(servername_label)
+        basic_group.add(servername_row)
+        
+        # Document root (read-only)
+        docroot_row = Adw.ActionRow()
+        docroot_row.set_title(_("Document Root"))
+        docroot_label = Gtk.Label(label=details.get('document_root', 'N/A'))
+        docroot_label.set_selectable(True)
+        docroot_row.add_suffix(docroot_label)
+        basic_group.add(docroot_row)
+        
+        content_box.append(basic_group)
+        
+        # PHP Settings Group
+        php_group = Adw.PreferencesGroup()
+        php_group.set_title(_("PHP Configuration"))
+        php_group.set_description(_("Change PHP version for this virtual host"))
+        
+        # PHP version selector
+        php_versions = service.get_installed_php_versions()
+        php_row = Adw.ComboRow()
+        php_row.set_title(_("PHP Version"))
+        
+        php_model = Gtk.StringList()
+        php_model.append(_("None"))
+        php_versions_list = [None]
+        
+        current_php = details.get('php_version', '')
+        selected_index = 0
+        
+        for i, version in enumerate(php_versions, 1):
+            php_model.append(f"PHP {version}")
+            php_versions_list.append(version)
+            if version == current_php:
+                selected_index = i
+        
+        php_row.set_model(php_model)
+        php_row.set_selected(selected_index)
+        php_group.add(php_row)
+        
+        content_box.append(php_group)
+        
+        # SSL/HTTPS Settings Group
+        ssl_group = Adw.PreferencesGroup()
+        ssl_group.set_title(_("SSL/HTTPS Configuration"))
+        ssl_group.set_description(_("Current SSL status (cannot be changed in edit mode)"))
+        
+        # SSL status (read-only)
+        ssl_status_row = Adw.ActionRow()
+        ssl_status_row.set_title(_("SSL Status"))
+        ssl_enabled = details.get('ssl', False)
+        if ssl_enabled:
+            ssl_label = Gtk.Label(label="✅ Enabled")
+            ssl_label.add_css_class("success")
+        else:
+            ssl_label = Gtk.Label(label="❌ Disabled")
+        ssl_status_row.add_suffix(ssl_label)
+        ssl_group.add(ssl_status_row)
+        
+        content_box.append(ssl_group)
+        
+        scrolled.set_child(content_box)
+        toolbar_view.set_content(scrolled)
+        dialog.set_child(toolbar_view)
+        
+        # Save button handler
+        def on_save_clicked(button):
+            php_selected = php_row.get_selected()
+            new_php_version = php_versions_list[php_selected]
+            old_php_version = details.get('php_version', '')
+            
+            # Check if PHP version changed
+            if new_php_version != old_php_version:
+                if new_php_version:
+                    # Update to new PHP version
+                    success, message = service.update_vhost_php_version(details['filename'], new_php_version)
+                else:
+                    # Remove PHP configuration (set to empty)
+                    success, message = service.update_vhost_php_version(details['filename'], '')
+                
+                self._show_toast(message)
+                
+                if success:
+                    dialog.close()
+                    parent_dialog.close()
+                    if self.current_service and self.current_service.name == service.name:
+                        self._refresh_detail_page()
+            else:
+                self._show_toast(_("No changes made"))
+                dialog.close()
+        
+        save_button.connect("clicked", on_save_clicked)
+        dialog.present(parent_dialog)
     
     def _on_vhost_delete_confirm(self, service, details, parent_dialog):
         """Confirm and delete virtual host"""
