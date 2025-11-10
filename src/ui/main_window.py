@@ -652,53 +652,7 @@ class MainWindow(Adw.ApplicationWindow):
         logger.info(f"Toast: {message}")
         print(f"📢 {message}")
     
-    def _show_sudo_password_dialog(self, callback):
-        """Show sudo password dialog and call callback with password"""
-        dialog = Adw.MessageDialog.new(self)
-        dialog.set_heading(_("Administrator Password Required"))
-        dialog.set_body(_("MySQL operations require administrator privileges. Please enter your password."))
-        
-        dialog.add_response("cancel", _("Cancel"))
-        dialog.add_response("ok", _("OK"))
-        dialog.set_response_appearance("ok", Adw.ResponseAppearance.SUGGESTED)
-        dialog.set_default_response("ok")
-        
-        # Password entry
-        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        content_box.set_spacing(12)
-        content_box.set_margin_top(12)
-        content_box.set_margin_bottom(12)
-        content_box.set_margin_start(12)
-        content_box.set_margin_end(12)
-        
-        password_entry = Adw.PasswordEntryRow()
-        password_entry.set_title(_("Password"))
-        password_entry.set_show_apply_button(False)
-        
-        content_box.append(password_entry)
-        dialog.set_extra_child(content_box)
-        
-        def on_response(dialog, response):
-            if response == "ok":
-                password = password_entry.get_text()
-                if password:
-                    callback(password)
-                else:
-                    self._show_toast(_("Password is required"))
-                    # Show dialog again
-                    GLib.timeout_add(100, lambda: self._show_sudo_password_dialog(callback))
-            dialog.close()
-        
-        dialog.connect("response", on_response)
-        
-        # Enter key aktivasyonu
-        def on_entry_activate(entry):
-            dialog.response("ok")
-        
-        password_entry.connect("entry-activated", on_entry_activate)
-        
-        dialog.present()
-        password_entry.grab_focus()
+
     
     # ==================== NAVIGATION ====================
     
@@ -954,45 +908,25 @@ class MainWindow(Adw.ApplicationWindow):
         mysql_info_group.set_title(_("MySQL Status"))
         
         try:
-            # Basic info without sudo (just check if running/installed)
-            mysql_info = {
-                'installed': service.is_installed(),
-                'running': service.is_running(),
-                'databases_count': 0,
-                'users_count': 0,
-                'root_access': False,
-                'auth_method': 'Unknown'
-            }
+            # Get MySQL info (sudo available from startup)
+            mysql_info = service.get_mysql_status_info()
             
-            # If MySQL is running, try to get detailed info
-            if service.is_running():
-                # Check if we need sudo
-                try:
-                    # Try to get info without sudo first
-                    detailed_info = service.get_mysql_status_info()
-                    mysql_info.update(detailed_info)
-                except Exception as e:
-                    # If it fails, it probably needs sudo
-                    logger.warning(f"MySQL info needs sudo: {e}")
-                    # We'll show a button to load detailed info with sudo
-            
-            # If we couldn't get detailed info, show a button to load it with sudo
-            if mysql_info.get('databases_count') == 0 and mysql_info.get('users_count') == 0:
-                load_info_row = Adw.ActionRow()
-                load_info_row.set_title(_("Load MySQL Details"))
-                load_info_row.set_subtitle(_("Click to load database and user information"))
-                load_info_row.set_activatable(True)
-                
-                def load_mysql_info(row):
-                    self._load_mysql_info_with_sudo(service, main_box, mysql_info_group)
-                
-                load_info_row.connect("activated", load_mysql_info)
-                load_icon = Gtk.Image.new_from_icon_name("view-refresh-symbolic")
-                load_info_row.add_prefix(load_icon)
-                mysql_info_group.add(load_info_row)
+            # Root access status
+            root_access_row = Adw.ActionRow()
+            root_access_row.set_title(_("Root Access"))
+            if mysql_info.get('root_access', False):
+                if mysql_info.get('auth_method') == 'Unix Socket (sudo mysql)':
+                    root_status_label = Gtk.Label(label="🔓 Unix Socket (sudo)")
+                    root_status_label.add_css_class("success")
+                else:
+                    root_status_label = Gtk.Label(label="🔐 Password Auth")
+                    root_status_label.add_css_class("success")
             else:
-                # Show detailed info
-                self._show_mysql_detailed_info(mysql_info_group, mysql_info, service)
+                root_status_label = Gtk.Label(label="🔒 Access Denied")
+                root_status_label.add_css_class("error")
+            
+            root_access_row.add_suffix(root_status_label)
+            mysql_info_group.add(root_access_row)
             
             # Root password/method display
             auth_row = Adw.ActionRow()
@@ -1002,18 +936,6 @@ class MainWindow(Adw.ApplicationWindow):
             auth_label.add_css_class("monospace")
             auth_row.add_suffix(auth_label)
             mysql_info_group.add(auth_row)
-            
-            # Root password display (if known)
-            if mysql_info.get('root_access') and mysql_info.get('auth_method') != 'Unix Socket (sudo mysql)':
-                password_display_row = Adw.ActionRow()
-                password_display_row.set_title(_("Root Password"))
-                password_text = mysql_info.get('root_password', 'Unknown')
-                if password_text == 'Empty':
-                    password_text = "(Empty)"
-                password_display_label = Gtk.Label(label=password_text)
-                password_display_label.add_css_class("monospace")
-                password_display_row.add_suffix(password_display_label)
-                mysql_info_group.add(password_display_row)
             
             # Version row
             version_row = Adw.ActionRow()
@@ -1056,31 +978,7 @@ class MainWindow(Adw.ApplicationWindow):
         
         main_box.append(mysql_info_group)
     
-    def _load_mysql_info_with_sudo(self, service, main_box, mysql_info_group):
-        """Load MySQL detailed info with sudo password"""
-        def on_password_provided(password):
-            try:
-                # Get detailed info with sudo
-                detailed_info = service.get_mysql_status_info()
-                
-                # Clear the current group and rebuild with detailed info
-                # Remove the load button and add detailed info
-                child = mysql_info_group.get_first_child()
-                while child:
-                    next_child = child.get_next_sibling()
-                    mysql_info_group.remove(child)
-                    child = next_child
-                
-                # Add detailed info
-                self._show_mysql_detailed_info(mysql_info_group, detailed_info, service)
-                
-                self._show_toast(_("MySQL information loaded successfully"))
-                
-            except Exception as e:
-                logger.error(f"Error loading MySQL info with sudo: {e}")
-                self._show_toast(_("Failed to load MySQL information"))
-        
-        self._show_sudo_password_dialog(on_password_provided)
+
     
     def _show_mysql_detailed_info(self, mysql_info_group, mysql_info, service):
         """Show detailed MySQL information"""
@@ -1112,21 +1010,7 @@ class MainWindow(Adw.ApplicationWindow):
         db_count_row.connect("activated", lambda r: self._show_mysql_databases(service, mysql_info.get('databases', [])))
         mysql_info_group.add(db_count_row)
         
-        # Users count (clickable to show list)  
-        users_count_row = Adw.ActionRow()
-        users_count_row.set_title(_("Users"))
-        users_count_row.set_subtitle(_("Click to view user list"))
-        users_count_label = Gtk.Label(label=str(mysql_info.get('users_count', 0)))
-        users_count_label.add_css_class("monospace")
-        users_count_row.add_suffix(users_count_label)
-        users_count_row.set_activatable(True)
-        users_count_row.connect("activated", lambda r: self._show_mysql_users(service, mysql_info.get('users', [])))
-        mysql_info_group.add(users_count_row)
-        connection_info_row = Adw.ActionRow()
-        connection_info_row.set_title(_("Connection Information"))
-        connection_info_row.set_subtitle(_("Show connection details for client applications"))
-        connection_info_row.set_activatable(True)
-        connection_info_row.connect("activated", lambda r: self._on_mysql_connection_info(service))
+
 
     
     def _on_mysql_change_password(self, service):
@@ -1246,29 +1130,14 @@ class MainWindow(Adw.ApplicationWindow):
                 
                 dialog.close()
                 
-                # Check if we need sudo password
-                mysql_info = service.get_mysql_status_info()
-                if mysql_info.get('auth_method') == 'Unix Socket (sudo mysql)':
-                    # Need sudo password
-                    def on_password_provided(sudo_password):
-                        success, message = service.create_database(db_name, sudo_password=sudo_password)
-                        self._show_toast(message)
-                        
-                        if success:
-                            # Refresh detail page
-                            if self.current_service and self.current_service.name == service.name:
-                                self._refresh_detail_page()
-                    
-                    self._show_sudo_password_dialog(on_password_provided)
-                else:
-                    # Use existing password
-                    success, message = service.create_database(db_name)
-                    self._show_toast(message)
-                    
-                    if success:
-                        # Refresh detail page
-                        if self.current_service and self.current_service.name == service.name:
-                            self._refresh_detail_page()
+                # Create database (sudo already available from startup)
+                success, message = service.create_database(db_name)
+                self._show_toast(message)
+                
+                if success:
+                    # Refresh detail page
+                    if self.current_service and self.current_service.name == service.name:
+                        self._refresh_detail_page()
         
         dialog.connect("response", on_response)
         dialog.present()
