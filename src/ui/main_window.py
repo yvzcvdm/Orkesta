@@ -92,8 +92,8 @@ class MainWindow(Adw.ApplicationWindow):
         # Split View (Sidebar + Content)
         split_view = Adw.OverlaySplitView()
         split_view.set_sidebar_position(Gtk.PackType.START)
-        split_view.set_max_sidebar_width(250)
-        split_view.set_min_sidebar_width(200)
+        split_view.set_max_sidebar_width(400)
+        split_view.set_min_sidebar_width(320)
         
         # Sidebar
         sidebar = self._create_sidebar()
