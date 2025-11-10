@@ -1,0 +1,1083 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the Orkesta package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Orkesta 1.0\n"
+"Report-Msgid-Bugs-To: your@email.com\n"
+"POT-Creation-Date: 2025-11-10 18:42+0300\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:139
+msgid "💻 Operating System"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:143
+msgid "📦 Version"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:147
+msgid "🐧 Distribution"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:151
+msgid "⚙️ Kernel"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:155
+msgid "🔧 Architecture"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:159
+msgid "📥 Package Manager"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:164
+msgid "🌐 IP Address"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:169
+msgid "🖥️ Hostname"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:175
+msgid "🐍 Python"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:199
+msgid "📊 Total Services"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:203
+msgid "✅ Installed"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:207
+msgid "🟢 Running"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:285
+msgid "Refresh"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:325
+msgid "No Services"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:326
+msgid "Add service modules to services/ directory"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:415
+#, python-brace-format
+msgid "Install {service}?"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:416
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:466
+msgid "A terminal window will open. Please enter your password when prompted."
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:418
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:468
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:546
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1042
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1118
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1180
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1228
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1749
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1771
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1802
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1833
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1870
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1913
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2136
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2363
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2420
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2554
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2627
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2702
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2783
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2795
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2863
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2961
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:3138
+msgid "Cancel"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:419
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:864
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1772
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2628
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2864
+msgid "Install"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:448
+msgid "Terminal opened. Please complete installation there."
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:456
+#, python-brace-format
+msgid "Could not open terminal. Install manually: sudo bash {script} install"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:465
+#, python-brace-format
+msgid "Uninstall {service}?"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:469
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:854
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1803
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2784
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2796
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2940
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2962
+msgid "Uninstall"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:498
+msgid "Terminal opened. Please complete uninstallation there."
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:506
+#, python-brace-format
+msgid ""
+"Could not open terminal. Uninstall manually: sudo bash {script} uninstall"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:542
+msgid "Please Wait"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:553
+msgid "Operation cancelled by user"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:567
+msgid "Working..."
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:576
+msgid "This may take a few minutes..."
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:627
+msgid "Operation Failed"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:629
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1083
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1086
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1895
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2903
+msgid "OK"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:780
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:971
+msgid "Status"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:800
+msgid "Port"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:808
+msgid "Type"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:817
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2257
+msgid "Actions"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:824
+msgid "Stop Service"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:825
+msgid "Stop the running service"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:834
+msgid "Restart Service"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:835
+msgid "Restart the service"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:844
+msgid "Start Service"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:845
+msgid "Start the service"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:855
+msgid "Remove this service from your system"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:865
+msgid "Install this service and its dependencies"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:888
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1420
+msgid "Configuration"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:889
+msgid "Configuration options coming soon"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:894
+msgid "Logs"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:895
+msgid "Log viewer coming soon"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:906
+msgid "MySQL Status"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:914
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:985
+msgid "Root Access"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:931
+msgid "Authentication Method"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:940
+msgid "MySQL Version"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:948
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1002
+msgid "Databases"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:949
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1003
+msgid "Click to view database list"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:959
+msgid "Users"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:960
+msgid "Click to view user list"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1016
+msgid "Set MySQL Root Password"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1017
+msgid ""
+"Set a new password for MySQL root user. Current password is not required."
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1025
+msgid "New Password:"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1031
+msgid "Confirm Password:"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1043
+msgid "Set Password"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1052
+msgid "Password cannot be empty"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1056
+msgid "Passwords do not match"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1063
+msgid "Setting MySQL root password..."
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1064
+msgid "MySQL root password set successfully!"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1065
+msgid "Failed to set MySQL root password"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1075
+msgid "MySQL Secure Installation"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1081
+msgid "Open a terminal and run the command to secure your MySQL installation."
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1082
+msgid "Open Terminal"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1098
+msgid "Could not open terminal. Run 'mysql_secure_installation' manually."
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1105
+msgid "Create MySQL Database"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1106
+msgid "Enter the name for the new database"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1119
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1917
+msgid "Create"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1126
+msgid "Database name cannot be empty"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1145
+msgid "Create MySQL User"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1146
+msgid "Enter user details"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1154
+msgid "Username:"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1160
+msgid "Password:"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1166
+msgid "Host (optional):"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1181
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:3067
+msgid "Create User"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1191
+msgid "Username and password are required"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1225
+msgid "Setup MySQL for Client Applications"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1226
+msgid ""
+"This will configure MySQL to work with external client applications like "
+"Navicat, DBGate, and phpMyAdmin."
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1229
+msgid "Setup"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1237
+msgid "Setting up MySQL for client applications..."
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1238
+msgid "MySQL client setup completed successfully!"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1239
+msgid "Failed to setup MySQL for client applications"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1247
+msgid "MySQL Connection Information"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1298
+msgid "Error retrieving connection information"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1300
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2953
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2992
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:3048
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:3066
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:3121
+msgid "Close"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1314
+msgid "PHP Version Management"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1318
+msgid "Active Version"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1329
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1585
+msgid "Installed Versions"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1336
+msgid "Available Versions"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1344
+msgid "Version Actions"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1348
+msgid "Install New Version"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1349
+msgid "Install additional PHP version"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1359
+msgid "Switch Version"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1360
+msgid "Change active PHP version"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1370
+msgid "Uninstall Version"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1371
+msgid "Remove a PHP version"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1382
+msgid "Extensions"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1390
+msgid "Installed Extensions"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1398
+msgid "Install Extension"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1399
+msgid "Install a PHP extension"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1408
+msgid "Manage Extensions"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1409
+msgid "View and uninstall extensions"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1425
+msgid "Configuration File"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1432
+msgid "Memory Limit"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1441
+msgid "Upload Max Size"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1452
+msgid "PHP Information"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1454
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1539
+msgid "Error"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1464
+msgid "PHP Integration"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1465
+msgid "Manage PHP module for Apache web server"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1481
+msgid "PHP Module Status"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1495
+msgid "Installed"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1498
+msgid "PHP module not installed for Apache"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1499
+msgid "Not Installed"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1510
+msgid "Uninstall PHP Module"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1511
+msgid "Remove PHP support from Apache"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1520
+msgid "Install PHP Module"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1521
+msgid "Enable PHP support in Apache"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1530
+msgid "PHP Not Available"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1531
+msgid "Install PHP service first to enable PHP support"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1548
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1982
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2239
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2469
+msgid "PHP Configuration"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1556
+msgid "Active PHP Version"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1562
+msgid "Not detected"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1570
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1705
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2654
+msgid "Switch PHP Version"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1571
+msgid "Change the active PHP version for Apache"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1596
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2007
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2498
+msgid "SSL/HTTPS Configuration"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1603
+msgid "SSL Module"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1616
+msgid "Enable SSL Module"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1617
+msgid "Enable HTTPS support in Apache"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1626
+msgid "Create Self-Signed Certificate"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1627
+msgid "Generate SSL certificate for a domain"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1641
+msgid "Virtual Hosts"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1648
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1905
+msgid "Create Virtual Host"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1649
+msgid "Add a new website configuration"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1660
+msgid "Existing Virtual Hosts"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1706
+msgid "Select the PHP version to use with Apache"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1750
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2703
+msgid "Switch"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1768
+msgid "Install PHP Module?"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1769
+msgid "This will install PHP support for Apache. The server will be restarted."
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1778
+msgid "Installing PHP module..."
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1799
+msgid "Uninstall PHP Module?"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1800
+msgid "This will remove PHP support from Apache. The server will be restarted."
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1809
+msgid "Uninstalling PHP module..."
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1830
+msgid "Enable SSL Module?"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1831
+msgid "This will enable HTTPS support in Apache. The server will be restarted."
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1834
+msgid "Enable SSL"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1851
+msgid "Create SSL Certificate"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1852
+msgid "Enter the domain name for the certificate"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1871
+msgid "Create Certificate"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1878
+msgid "Domain name cannot be empty"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1888
+msgid "Certificate Created"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1890
+#, python-brace-format
+msgid ""
+"Certificate: {cert}\n"
+"Key: {key}"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1939
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2446
+msgid "Basic Settings"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1940
+msgid "Configure domain name and document root"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1944
+msgid "Server Name (Domain)"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1951
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2207
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2459
+msgid "Document Root"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1952
+msgid "Location of website files"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1965
+msgid "Browse"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1969
+msgid "Select Document Root"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1983
+msgid "Select PHP version for this virtual host"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1988
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2226
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2475
+msgid "PHP Version"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1989
+msgid "Leave as 'None' if not using PHP"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:1992
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2478
+msgid "None"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2008
+msgid "Enable HTTPS with automatic certificate generation"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2012
+msgid "Enable SSL/HTTPS"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2013
+msgid "Listen on port 443 with automatic self-signed certificate"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2019
+msgid "Certificate Generation"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2020
+msgid "A self-signed certificate will be automatically created and configured"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2050
+msgid "Server name cannot be empty"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2061
+msgid "Creating virtual host..."
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2131
+msgid "Delete Virtual Host?"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2132
+#, python-brace-format
+msgid "Are you sure you want to delete '{name}'? This action cannot be undone."
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2137
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2555
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:3139
+msgid "Delete"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2158
+msgid "Invalid virtual host data"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2162
+msgid "Could not load virtual host details"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2195
+msgid "Site Information"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2199
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2451
+msgid "Server Name"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2215
+msgid "SSL/HTTPS"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2231
+msgid "Not configured"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2245
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2320
+msgid "Change PHP Version"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2246
+msgid "Switch to a different PHP version"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2261
+msgid "Edit Virtual Host"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2262
+msgid "Modify domain, document root, PHP and SSL settings"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2274
+msgid "Disable Site"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2275
+msgid "Temporarily disable this virtual host"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2283
+msgid "Enable Site"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2284
+msgid "Enable this virtual host"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2293
+msgid "Open in Browser"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2303
+msgid "Delete Virtual Host"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2304
+msgid "Permanently remove this site"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2321
+#, python-brace-format
+msgid "Select the PHP version for {name}"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2364
+msgid "Change"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2406
+msgid "Could not open browser"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2412
+#, python-brace-format
+msgid "Edit Virtual Host: {name}"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2424
+msgid "Save"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2447
+msgid "Domain and document root (read-only)"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2470
+msgid "Change PHP version for this virtual host"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2499
+msgid "Current SSL status (cannot be changed in edit mode)"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2503
+msgid "SSL Status"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2542
+msgid "No changes made"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2551
+#, python-brace-format
+msgid "Delete {name}?"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2552
+msgid ""
+"This will permanently delete the virtual host configuration. The document "
+"root files will not be deleted."
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2585
+msgid "All available PHP versions are already installed"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2588
+msgid "Install PHP Version"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2589
+msgid "Select a PHP version to install"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2655
+msgid "Select the PHP version to activate"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2710
+msgid "This version is already active"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2741
+msgid "Cannot uninstall the active PHP version"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2744
+msgid "Uninstall PHP Version"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2745
+msgid ""
+"Select a PHP version to uninstall. The active version cannot be uninstalled."
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2793
+msgid "Confirm Uninstall"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2794
+#, python-brace-format
+msgid ""
+"Are you sure you want to uninstall PHP {version}? This action cannot be "
+"undone."
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2824
+msgid "Install PHP Extension"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2825
+msgid "Enter the extension name or select from popular extensions"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2833
+msgid "Extension Name:"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2844
+msgid "Popular Extensions:"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2871
+msgid "Extension name is required"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2875
+msgid "Invalid extension name"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2898
+msgid "Manage PHP Extensions"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2899
+msgid "Installed PHP extensions"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2902
+msgid "No extensions found"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2933
+msgid "Core"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2958
+msgid "Uninstall Extension"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2959
+#, python-brace-format
+msgid "Are you sure you want to uninstall the {extension} extension?"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2988
+msgid "MySQL Databases"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2991
+msgid "No user databases found. You can create your first database now."
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:2993
+msgid "Create Database"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:3027
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:3135
+msgid "Delete Database"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:3049
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:3122
+msgid "Create New"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:3062
+msgid "MySQL Users"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/src/ui/main_window.py:3065
+msgid "No users found. You can create your first user now."
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/services/apache.py:36
+msgid "Apache HTTP Server - Web server for hosting websites"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/services/base_service.py:152
+#, python-brace-format
+msgid "Script file not found: {path}"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/services/base_service.py:189
+msgid "Operation completed successfully"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/services/base_service.py:193
+msgid "Unknown error"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/services/base_service.py:198
+msgid "Authentication cancelled or failed"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/services/base_service.py:204
+msgid "Operation timed out"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/services/mysql.py:35
+msgid "MySQL Database Server - Relational database management system"
+msgstr ""
+
+#: /media/yavuz/Depo/developer/Orkesta/services/php.py:38
+msgid "PHP - Server-side scripting language for web development"
+msgstr ""

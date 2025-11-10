@@ -1459,6 +1459,94 @@ class MainWindow(Adw.ApplicationWindow):
     def _add_apache_sections(self, main_box, service):
         """Add Apache-specific sections to detail page"""
         
+        # Apache Modules Management
+        modules_group = Adw.PreferencesGroup()
+        modules_group.set_title(_("Apache Modules"))
+        modules_group.set_description(_("Manage Apache modules (enable/disable)"))
+        
+        try:
+            # Manage Modules button
+            manage_modules_row = Adw.ActionRow()
+            manage_modules_row.set_title(_("Manage Modules"))
+            manage_modules_row.set_subtitle(_("Enable or disable Apache modules"))
+            manage_modules_row.set_activatable(True)
+            manage_modules_row.connect("activated", lambda r: self._on_apache_manage_modules(service))
+            manage_icon = Gtk.Image.new_from_icon_name("preferences-system-symbolic")
+            manage_modules_row.add_prefix(manage_icon)
+            modules_group.add(manage_modules_row)
+            
+            # Show some key modules status
+            modules = service.list_modules()
+            
+            # Filter important modules to show
+            important_modules = ['ssl', 'rewrite', 'headers', 'deflate', 'expires']
+            php_modules = [m for m in modules if m['name'].startswith('php')]
+            
+            # Show PHP module if exists
+            if php_modules:
+                for php_mod in php_modules[:1]:  # Show only first PHP module
+                    php_row = Adw.ActionRow()
+                    php_row.set_title(f"PHP Module ({php_mod['name']})")
+                    if php_mod['enabled']:
+                        status_label = Gtk.Label(label="✅ " + _("Enabled"))
+                        status_label.add_css_class("success")
+                    else:
+                        status_label = Gtk.Label(label="❌ " + _("Disabled"))
+                        status_label.add_css_class("error")
+                    php_row.add_suffix(status_label)
+                    modules_group.add(php_row)
+            
+            # Show SSL module
+            ssl_modules = [m for m in modules if m['name'] == 'ssl']
+            if ssl_modules:
+                ssl_mod = ssl_modules[0]
+                ssl_row = Adw.ActionRow()
+                ssl_row.set_title("SSL Module")
+                if ssl_mod['enabled']:
+                    status_label = Gtk.Label(label="✅ " + _("Enabled"))
+                    status_label.add_css_class("success")
+                else:
+                    status_label = Gtk.Label(label="❌ " + _("Disabled"))
+                    status_label.add_css_class("error")
+                ssl_row.add_suffix(status_label)
+                modules_group.add(ssl_row)
+            
+            # Show Rewrite module
+            rewrite_modules = [m for m in modules if m['name'] == 'rewrite']
+            if rewrite_modules:
+                rewrite_mod = rewrite_modules[0]
+                rewrite_row = Adw.ActionRow()
+                rewrite_row.set_title("Rewrite Module")
+                if rewrite_mod['enabled']:
+                    status_label = Gtk.Label(label="✅ " + _("Enabled"))
+                    status_label.add_css_class("success")
+                else:
+                    status_label = Gtk.Label(label="❌ " + _("Disabled"))
+                    status_label.add_css_class("error")
+                rewrite_row.add_suffix(status_label)
+                modules_group.add(rewrite_row)
+            
+            # Show module count
+            enabled_count = sum(1 for m in modules if m['enabled'])
+            total_count = len(modules)
+            count_row = Adw.ActionRow()
+            count_row.set_title(_("Total Modules"))
+            count_label = Gtk.Label(label=f"{enabled_count}/{total_count} " + _("enabled"))
+            count_label.add_css_class("monospace")
+            count_row.add_suffix(count_label)
+            modules_group.add(count_row)
+        
+        except Exception as e:
+            logger.error(f"Error loading modules: {e}")
+            # Show error in UI
+            error_row = Adw.ActionRow()
+            error_row.set_title(_("Error"))
+            error_row.set_subtitle(str(e))
+            error_row.set_sensitive(False)
+            modules_group.add(error_row)
+        
+        main_box.append(modules_group)
+        
         # PHP Version Management
         php_group = Adw.PreferencesGroup()
         php_group.set_title(_("PHP Configuration"))
@@ -1507,50 +1595,25 @@ class MainWindow(Adw.ApplicationWindow):
         
         main_box.append(php_group)
         
-        # SSL Configuration
-        ssl_group = Adw.PreferencesGroup()
-        ssl_group.set_title(_("SSL/HTTPS Configuration"))
+        # SSL Certificate Management
+        ssl_cert_group = Adw.PreferencesGroup()
+        ssl_cert_group.set_title(_("SSL Certificates"))
         
         try:
-            ssl_enabled = service.is_ssl_module_enabled()
-            
-            # SSL status row
-            ssl_status_row = Adw.ActionRow()
-            ssl_status_row.set_title(_("SSL Module"))
-            if ssl_enabled:
-                ssl_status_label = Gtk.Label(label="✅ Enabled")
-                ssl_status_label.add_css_class("success")
-            else:
-                ssl_status_label = Gtk.Label(label="❌ Disabled")
-                ssl_status_label.add_css_class("error")
-            ssl_status_row.add_suffix(ssl_status_label)
-            ssl_group.add(ssl_status_row)
-            
-            if not ssl_enabled:
-                # Enable SSL button
-                enable_ssl_row = Adw.ActionRow()
-                enable_ssl_row.set_title(_("Enable SSL Module"))
-                enable_ssl_row.set_subtitle(_("Enable HTTPS support in Apache"))
-                enable_ssl_row.set_activatable(True)
-                enable_ssl_row.connect("activated", lambda r: self._on_apache_enable_ssl(service))
-                enable_ssl_icon = Gtk.Image.new_from_icon_name("security-high-symbolic")
-                enable_ssl_row.add_prefix(enable_ssl_icon)
-                ssl_group.add(enable_ssl_row)
-            else:
-                # Create self-signed certificate button
-                create_cert_row = Adw.ActionRow()
-                create_cert_row.set_title(_("Create Self-Signed Certificate"))
-                create_cert_row.set_subtitle(_("Generate SSL certificate for a domain"))
-                create_cert_row.set_activatable(True)
-                create_cert_row.connect("activated", lambda r: self._on_apache_create_certificate(service))
-                create_cert_icon = Gtk.Image.new_from_icon_name("document-new-symbolic")
-                create_cert_row.add_prefix(create_cert_icon)
-                ssl_group.add(create_cert_row)
+            # Create self-signed certificate button
+            create_cert_row = Adw.ActionRow()
+            create_cert_row.set_title(_("Create Self-Signed Certificate"))
+            create_cert_row.set_subtitle(_("Generate SSL certificate for a domain"))
+            create_cert_row.set_activatable(True)
+            create_cert_row.connect("activated", lambda r: self._on_apache_create_certificate(service))
+            create_cert_icon = Gtk.Image.new_from_icon_name("document-new-symbolic")
+            create_cert_row.add_prefix(create_cert_icon)
+            ssl_cert_group.add(create_cert_row)
         
         except Exception as e:
-            logger.error(f"Error getting SSL info: {e}")
+            logger.error(f"Error with SSL certificates: {e}")
         
-        main_box.append(ssl_group)
+        main_box.append(ssl_cert_group)
         
         # Virtual Hosts Management
         vhosts_group = Adw.PreferencesGroup()
@@ -1580,22 +1643,35 @@ class MainWindow(Adw.ApplicationWindow):
                 for vhost in vhosts:
                     vhost_row = Adw.ActionRow()
                     
-                    # Use filename as title if server_name not available
-                    # Don't call get_vhost_details here to avoid blocking
+                    # Use server_name as title, fallback to filename
                     title = vhost.get('server_name', vhost.get('filename', 'Unknown'))
+                    if not title or title == '':
+                        title = vhost.get('filename', 'Unknown')
                     if title.endswith('.conf'):
                         title = title[:-5]  # Remove .conf extension
                     
                     vhost_row.set_title(title)
                     
-                    # Subtitle with basic info
+                    # Subtitle with status info
                     subtitle_parts = []
+                    
+                    # Enabled status
                     if vhost.get('enabled'):
                         subtitle_parts.append("✅ Enabled")
                     else:
                         subtitle_parts.append("❌ Disabled")
                     
-                    if vhost.get('filename'):
+                    # SSL status
+                    if vhost.get('ssl'):
+                        subtitle_parts.append("🔒 SSL")
+                    
+                    # PHP version
+                    php_version = vhost.get('php_version', '')
+                    if php_version:
+                        subtitle_parts.append(f"🐘 PHP {php_version}")
+                    
+                    # Filename if different from title
+                    if vhost.get('filename') and vhost.get('filename') != title and not title.endswith('.conf'):
                         subtitle_parts.append(vhost['filename'])
                     
                     vhost_row.set_subtitle(' • '.join(subtitle_parts))
@@ -1677,6 +1753,223 @@ class MainWindow(Adw.ApplicationWindow):
         
         dialog.connect("response", on_response)
         dialog.present()
+    
+    def _on_apache_install_php_module(self, service):
+        """Install PHP module for Apache"""
+        dialog = Adw.MessageDialog.new(self)
+        dialog.set_heading(_("Install PHP Module?"))
+        dialog.set_body(_("This will install PHP support for Apache. The server will be restarted."))
+        
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("install", _("Install"))
+        dialog.set_response_appearance("install", Adw.ResponseAppearance.SUGGESTED)
+        
+        def on_response(dialog, response):
+            if response == "install":
+                dialog.close()
+                self._show_loading_dialog(_("Installing PHP module..."))
+                
+                # Thread'de çalıştır
+                import threading
+                def install_task():
+                    try:
+                        success, message = service.install_php_module()
+                        GLib.idle_add(self._on_operation_complete, success, message)
+                    except Exception as e:
+                        logger.error(f"Error installing PHP module: {e}")
+                        GLib.idle_add(self._on_operation_complete, False, str(e))
+                
+                thread = threading.Thread(target=install_task, daemon=True)
+                thread.start()
+        
+        dialog.connect("response", on_response)
+        dialog.present()
+    
+    def _on_apache_uninstall_php_module(self, service):
+        """Uninstall PHP module from Apache"""
+        dialog = Adw.MessageDialog.new(self)
+        dialog.set_heading(_("Uninstall PHP Module?"))
+        dialog.set_body(_("This will remove PHP support from Apache. The server will be restarted."))
+        
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("uninstall", _("Uninstall"))
+        dialog.set_response_appearance("uninstall", Adw.ResponseAppearance.DESTRUCTIVE)
+        
+        def on_response(dialog, response):
+            if response == "uninstall":
+                dialog.close()
+                self._show_loading_dialog(_("Uninstalling PHP module..."))
+                
+                # Thread'de çalıştır
+                import threading
+                def uninstall_task():
+                    try:
+                        success, message = service.uninstall_php_module()
+                        GLib.idle_add(self._on_operation_complete, success, message)
+                    except Exception as e:
+                        logger.error(f"Error uninstalling PHP module: {e}")
+                        GLib.idle_add(self._on_operation_complete, False, str(e))
+                
+                thread = threading.Thread(target=uninstall_task, daemon=True)
+                thread.start()
+        
+        dialog.connect("response", on_response)
+        dialog.present()
+    
+    def _on_apache_manage_modules(self, service):
+        """Show Apache modules management dialog"""
+        # Create main dialog
+        dialog = Adw.Dialog()
+        dialog.set_title(_("Apache Modules"))
+        dialog.set_content_width(500)
+        dialog.set_content_height(600)
+        
+        # Main container
+        toolbar_view = Adw.ToolbarView()
+        
+        # Header bar
+        header_bar = Adw.HeaderBar()
+        toolbar_view.add_top_bar(header_bar)
+        
+        # Content box with loading state
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        content_box.set_margin_top(12)
+        content_box.set_margin_bottom(12)
+        content_box.set_margin_start(12)
+        content_box.set_margin_end(12)
+        
+        # Loading spinner initially
+        loading_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        loading_box.set_valign(Gtk.Align.CENTER)
+        loading_box.set_spacing(12)
+        
+        spinner = Gtk.Spinner()
+        spinner.set_spinning(True)
+        spinner.set_size_request(32, 32)
+        loading_box.append(spinner)
+        
+        loading_label = Gtk.Label(label=_("Loading modules..."))
+        loading_label.add_css_class("dim-label")
+        loading_box.append(loading_label)
+        
+        content_box.append(loading_box)
+        toolbar_view.set_content(content_box)
+        dialog.set_child(toolbar_view)
+        
+        # Load modules in thread
+        import threading
+        def load_modules_task():
+            try:
+                modules = service.list_modules()
+                GLib.idle_add(self._populate_modules_dialog, content_box, loading_box, modules, service, dialog)
+            except Exception as e:
+                logger.error(f"Error loading modules: {e}")
+                GLib.idle_add(self._populate_modules_dialog, content_box, loading_box, [], service, dialog, str(e))
+        
+        thread = threading.Thread(target=load_modules_task, daemon=True)
+        thread.start()
+        
+        dialog.present(self)
+    
+    def _populate_modules_dialog(self, content_box, loading_box, modules, service, dialog, error=None):
+        """Populate modules dialog with loaded data"""
+        # Remove loading spinner
+        content_box.remove(loading_box)
+        
+        if error:
+            error_label = Gtk.Label(label=_("Error loading modules: ") + error)
+            error_label.set_wrap(True)
+            error_label.add_css_class("error")
+            content_box.append(error_label)
+            return False
+        
+        if not modules:
+            empty_label = Gtk.Label(label=_("No modules found"))
+            empty_label.add_css_class("dim-label")
+            empty_label.set_valign(Gtk.Align.CENTER)
+            content_box.append(empty_label)
+            return False
+        
+        # Create scrolled window
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_vexpand(True)
+        scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        
+        # Create list box with modules
+        list_box = Gtk.ListBox()
+        list_box.set_selection_mode(Gtk.SelectionMode.NONE)
+        list_box.add_css_class("boxed-list")
+        
+        # Sort modules: enabled first, then alphabetically
+        modules.sort(key=lambda m: (not m.get('enabled', False), m.get('name', '')))
+        
+        for module in modules:
+            row = Adw.ActionRow()
+            row.set_title(module.get('name', 'Unknown'))
+            
+            # Add description if available
+            description = module.get('description', '')
+            if description:
+                row.set_subtitle(description)
+            
+            # Add switch
+            switch = Gtk.Switch()
+            switch.set_active(module.get('enabled', False))
+            switch.set_valign(Gtk.Align.CENTER)
+            
+            # Store module name in switch
+            module_name = module.get('name', '')
+            switch.module_name = module_name
+            switch.service = service
+            switch.parent_dialog = dialog
+            
+            switch.connect("notify::active", self._on_module_switch_toggled)
+            
+            row.add_suffix(switch)
+            row.set_activatable_widget(switch)
+            
+            list_box.append(row)
+        
+        scrolled.set_child(list_box)
+        content_box.append(scrolled)
+        
+        return False
+    
+    def _on_module_switch_toggled(self, switch, param):
+        """Handle module enable/disable toggle"""
+        module_name = getattr(switch, 'module_name', '')
+        service = getattr(switch, 'service', None)
+        parent_dialog = getattr(switch, 'parent_dialog', None)
+        
+        if not module_name or not service:
+            return
+        
+        enabled = switch.get_active()
+        
+        # Close parent dialog and show loading
+        if parent_dialog:
+            parent_dialog.close()
+        
+        if enabled:
+            self._show_loading_dialog(_("Enabling module..."))
+        else:
+            self._show_loading_dialog(_("Disabling module..."))
+        
+        # Run in thread
+        import threading
+        def toggle_task():
+            try:
+                if enabled:
+                    success, message = service.enable_module(module_name)
+                else:
+                    success, message = service.disable_module(module_name)
+                GLib.idle_add(self._on_operation_complete, success, message)
+            except Exception as e:
+                logger.error(f"Error toggling module {module_name}: {e}")
+                GLib.idle_add(self._on_operation_complete, False, str(e))
+        
+        thread = threading.Thread(target=toggle_task, daemon=True)
+        thread.start()
     
     def _on_apache_enable_ssl(self, service):
         """Enable SSL module"""
@@ -2005,22 +2298,24 @@ class MainWindow(Adw.ApplicationWindow):
     
     def _show_vhost_detail(self, service, vhost):
         """Show virtual host detail page"""
-        # Get detailed information if not already loaded
-        if 'server_name' not in vhost or 'document_root' not in vhost:
-            filename = vhost.get('filename', '')
-            if not filename:
-                self._show_toast(_("Invalid virtual host data"))
-                return
-            details = service.get_vhost_details(filename)
-            if not details:
-                self._show_toast(_("Could not load virtual host details"))
-                return
-        else:
-            details = vhost
+        # Always get full detailed information from script
+        filename = vhost.get('filename', '')
+        if not filename:
+            self._show_toast(_("Invalid virtual host data"))
+            return
+        
+        details = service.get_vhost_details(filename)
+        if not details:
+            self._show_toast(_("Could not load virtual host details"))
+            return
+        
+        # Debug: Log details
+        logger.info(f"Vhost details for {filename}: {details}")
+        logger.info(f"Keys: {list(details.keys()) if isinstance(details, dict) else 'Not a dict'}")
         
         # Create detail dialog
         dialog = Adw.Dialog()
-        dialog.set_title(details['server_name'])
+        dialog.set_title(details.get('server_name', filename))
         
         # Main content
         toolbar_view = Adw.ToolbarView()
@@ -2051,28 +2346,26 @@ class MainWindow(Adw.ApplicationWindow):
         # Server name
         name_row = Adw.ActionRow()
         name_row.set_title(_("Server Name"))
-        name_label = Gtk.Label(label=details['server_name'])
-        name_label.set_selectable(True)
-        name_row.add_suffix(name_label)
+        server_name = details.get('server_name', 'N/A')
+        logger.info(f"Setting server_name: {server_name}")
+        name_row.set_subtitle(server_name)
         info_group.add(name_row)
         
         # Document root
         docroot_row = Adw.ActionRow()
         docroot_row.set_title(_("Document Root"))
-        docroot_label = Gtk.Label(label=details['document_root'] or "N/A")
-        docroot_label.set_selectable(True)
-        docroot_row.add_suffix(docroot_label)
+        doc_root = details.get('document_root', 'N/A')
+        logger.info(f"Setting document_root: {doc_root}")
+        docroot_row.set_subtitle(doc_root or "N/A")
         info_group.add(docroot_row)
         
         # SSL status
         ssl_row = Adw.ActionRow()
         ssl_row.set_title(_("SSL/HTTPS"))
         if details.get('ssl', False) or details.get('ssl_enabled', False):
-            ssl_label = Gtk.Label(label="✅ Enabled")
-            ssl_label.add_css_class("success")
+            ssl_row.set_subtitle("✅ " + _("Enabled"))
         else:
-            ssl_label = Gtk.Label(label="❌ Disabled")
-        ssl_row.add_suffix(ssl_label)
+            ssl_row.set_subtitle("❌ " + _("Disabled"))
         info_group.add(ssl_row)
         
         # PHP version
@@ -2080,10 +2373,9 @@ class MainWindow(Adw.ApplicationWindow):
         php_row.set_title(_("PHP Version"))
         php_version = details.get('php_version', '')
         if php_version:
-            php_label = Gtk.Label(label=f"PHP {php_version}")
+            php_row.set_subtitle(f"PHP {php_version}")
         else:
-            php_label = Gtk.Label(label=_("Not configured"))
-        php_row.add_suffix(php_label)
+            php_row.set_subtitle(_("Not configured"))
         info_group.add(php_row)
         
         content_box.append(info_group)
@@ -2145,7 +2437,7 @@ class MainWindow(Adw.ApplicationWindow):
         # Open in browser
         browse_row = Adw.ActionRow()
         browse_row.set_title(_("Open in Browser"))
-        browse_row.set_subtitle(f"http://{details['server_name']}/")
+        browse_row.set_subtitle(f"http://{details.get('server_name', 'N/A')}/")
         browse_row.set_activatable(True)
         browse_row.connect("activated", lambda r: self._on_vhost_open_browser(details))
         browse_icon = Gtk.Image.new_from_icon_name("web-browser-symbolic")
@@ -2171,42 +2463,46 @@ class MainWindow(Adw.ApplicationWindow):
     
     def _on_vhost_change_php(self, service, details, versions, parent_dialog):
         """Change PHP version for vhost"""
-        dialog = Adw.MessageDialog.new(parent_dialog, _("Change PHP Version"), None)
-        dialog.set_body(_("Select the PHP version for {name}").format(name=details['server_name']))
+        dialog = Adw.MessageDialog.new(self)
+        dialog.set_heading(_("Change PHP Version"))
+        dialog.set_body(_("Select the PHP version for {name}").format(name=details.get('server_name', 'N/A')))
         
         # Version selector
         list_box = Gtk.ListBox()
-        list_box.set_selection_mode(Gtk.SelectionMode.SINGLE)
+        list_box.set_selection_mode(Gtk.SelectionMode.NONE)
         list_box.add_css_class("boxed-list")
         
-        selected_version = [details['php_version']]
+        selected_version = [details.get('php_version', versions[0] if versions else '')]
+        check_buttons = []
         
         for version in versions:
-            row = Gtk.ListBoxRow()
-            box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-            box.set_spacing(12)
-            box.set_margin_top(8)
-            box.set_margin_bottom(8)
-            box.set_margin_start(12)
-            box.set_margin_end(12)
+            row = Adw.ActionRow()
+            row.set_title(f"PHP {version}")
+            row.set_activatable(True)
             
-            label = Gtk.Label(label=f"PHP {version}")
-            label.set_hexpand(True)
-            label.set_halign(Gtk.Align.START)
-            box.append(label)
+            # Check button
+            check = Gtk.CheckButton()
+            check.set_active(version == selected_version[0])
+            check.set_valign(Gtk.Align.CENTER)
+            row.add_suffix(check)
+            row.set_activatable_widget(check)
             
-            if version == details['php_version']:
-                check = Gtk.Image.new_from_icon_name("emblem-ok-symbolic")
-                box.append(check)
+            # Store version
+            check.version = version
+            check_buttons.append(check)
             
-            row.set_child(box)
-            row.version = version
+            # Make radio behavior (only one selected)
+            def on_check_toggled(check_btn):
+                if check_btn.get_active():
+                    selected_version[0] = check_btn.version
+                    # Uncheck others
+                    for other in check_buttons:
+                        if other != check_btn:
+                            other.set_active(False)
+            
+            check.connect("toggled", on_check_toggled)
+            
             list_box.append(row)
-        
-        def on_row_activated(listbox, row):
-            selected_version[0] = row.version
-        
-        list_box.connect("row-activated", on_row_activated)
         
         scrolled = Gtk.ScrolledWindow()
         scrolled.set_child(list_box)
@@ -2219,9 +2515,18 @@ class MainWindow(Adw.ApplicationWindow):
         dialog.set_response_appearance("change", Adw.ResponseAppearance.SUGGESTED)
         
         def on_response(dialog, response):
-            if response == "change" and selected_version[0]:
-                success, message = service.update_vhost_php_version(details['filename'], selected_version[0])
+            if response == "change":
+                new_version = selected_version[0]
+                logger.info(f"Changing PHP version for {details['filename']} to {new_version}")
+                
+                if not new_version:
+                    self._show_toast(_("Please select a PHP version"))
+                    return
+                
+                success, message = service.update_vhost_php_version(details['filename'], new_version)
+                logger.info(f"Update result: success={success}, message={message}")
                 self._show_toast(message)
+                
                 if success:
                     dialog.close()
                     parent_dialog.close()
@@ -2252,7 +2557,7 @@ class MainWindow(Adw.ApplicationWindow):
     def _on_vhost_open_browser(self, details):
         """Open virtual host in browser"""
         import subprocess
-        url = f"http://{details['server_name']}/"
+        url = f"http://{details.get('server_name', 'localhost')}/"
         try:
             subprocess.Popen(['xdg-open', url])
         except Exception as e:
@@ -2263,7 +2568,7 @@ class MainWindow(Adw.ApplicationWindow):
         """Edit virtual host configuration"""
         # Create edit dialog
         dialog = Adw.Dialog()
-        dialog.set_title(_("Edit Virtual Host: {name}").format(name=details['server_name']))
+        dialog.set_title(_("Edit Virtual Host: {name}").format(name=details.get('server_name', 'N/A')))
         
         # Create toolbar view
         toolbar_view = Adw.ToolbarView()
@@ -2303,7 +2608,7 @@ class MainWindow(Adw.ApplicationWindow):
         # Server name (read-only)
         servername_row = Adw.ActionRow()
         servername_row.set_title(_("Server Name"))
-        servername_label = Gtk.Label(label=details['server_name'])
+        servername_label = Gtk.Label(label=details.get('server_name', 'N/A'))
         servername_label.set_selectable(True)
         servername_row.add_suffix(servername_label)
         basic_group.add(servername_row)
@@ -2402,7 +2707,7 @@ class MainWindow(Adw.ApplicationWindow):
     def _on_vhost_delete_confirm(self, service, details, parent_dialog):
         """Confirm and delete virtual host"""
         dialog = Adw.MessageDialog.new(parent_dialog)
-        dialog.set_heading(_("Delete {name}?").format(name=details['server_name']))
+        dialog.set_heading(_("Delete {name}?").format(name=details.get('server_name', 'N/A')))
         dialog.set_body(_("This will permanently delete the virtual host configuration. The document root files will not be deleted."))
         
         dialog.add_response("cancel", _("Cancel"))

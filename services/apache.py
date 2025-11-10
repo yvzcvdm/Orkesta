@@ -114,12 +114,18 @@ class ApacheService(BaseService):
     
     def get_vhost_details(self, filename: str) -> Optional[Dict[str, Any]]:
         success, output = self._execute_script(self.SCRIPT_NAME, 'vhost-details', filename, '--json', timeout=30)
+        logger.info(f"get_vhost_details called for {filename}")
+        logger.info(f"Script result: success={success}, output={output}")
         if not success:
+            logger.error(f"Script failed for vhost-details: {filename}")
             return None
         try:
             import json
-            return json.loads(output)
-        except:
+            details = json.loads(output)
+            logger.info(f"Parsed JSON details: {details}")
+            return details
+        except Exception as e:
+            logger.error(f"JSON parse error for vhost-details: {e}, output={output}")
             return None
     
     def update_vhost_php_version(self, filename: str, php_version: str) -> Tuple[bool, str]:
@@ -146,6 +152,46 @@ class ApacheService(BaseService):
     
     def switch_php_version(self, version: str) -> Tuple[bool, str]:
         return self._execute_script(self.SCRIPT_NAME, 'php-switch', version, timeout=60)
+    
+    # ==================== MODULE MANAGEMENT ====================
+    
+    def list_modules(self) -> List[Dict[str, Any]]:
+        """List all Apache modules with their status"""
+        success, output = self._execute_script(self.SCRIPT_NAME, 'module-list', '--json', timeout=30)
+        if not success:
+            return []
+        try:
+            import json
+            return json.loads(output)
+        except:
+            return []
+    
+    def enable_module(self, module_name: str) -> Tuple[bool, str]:
+        """Enable an Apache module"""
+        return self._execute_script(self.SCRIPT_NAME, 'module-enable', module_name, timeout=60)
+    
+    def disable_module(self, module_name: str) -> Tuple[bool, str]:
+        """Disable an Apache module"""
+        return self._execute_script(self.SCRIPT_NAME, 'module-disable', module_name, timeout=60)
+    
+    def is_php_module_installed(self) -> bool:
+        """Check if PHP module is installed for Apache"""
+        success, output = self._execute_script(self.SCRIPT_NAME, 'php-module-installed', timeout=10)
+        return success and output.strip().lower() == 'true'
+    
+    def install_php_module(self, version: Optional[str] = None) -> Tuple[bool, str]:
+        """Install PHP module for Apache"""
+        args = ['php-module-install']
+        if version:
+            args.append(version)
+        return self._execute_script(self.SCRIPT_NAME, *args, timeout=300)
+    
+    def uninstall_php_module(self, version: Optional[str] = None) -> Tuple[bool, str]:
+        """Uninstall PHP module from Apache"""
+        args = ['php-module-uninstall']
+        if version:
+            args.append(version)
+        return self._execute_script(self.SCRIPT_NAME, *args, timeout=120)
     
     # ==================== SSL MANAGEMENT ====================
     

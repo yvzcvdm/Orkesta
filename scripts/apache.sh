@@ -403,14 +403,41 @@ action_vhost_list() {
                 enabled=true
             fi
             
-            vhosts+=("$basename:$enabled")
+            # Get additional info: server name, SSL, PHP
+            local server_name=$(grep -m1 "ServerName" "$file" | awk '{print $2}')
+            local ssl_enabled=false
+            local php_version=""
+            
+            if grep -q "SSLEngine on" "$file"; then
+                ssl_enabled=true
+            fi
+            
+            if grep -q "php.*fpm" "$file"; then
+                php_version=$(grep -oP 'php\K[0-9]+\.[0-9]+' "$file" | head -n1)
+            fi
+            
+            vhosts+=("$basename:$enabled:$server_name:$ssl_enabled:$php_version")
         done
     else
         # Fedora/Arch: All conf.d files are enabled
         for file in "$vhost_dir"/*.conf; do
             [ -f "$file" ] || continue
             local basename=$(basename "$file")
-            vhosts+=("$basename:true")
+            
+            # Get additional info
+            local server_name=$(grep -m1 "ServerName" "$file" | awk '{print $2}')
+            local ssl_enabled=false
+            local php_version=""
+            
+            if grep -q "SSLEngine on" "$file"; then
+                ssl_enabled=true
+            fi
+            
+            if grep -q "php.*fpm" "$file"; then
+                php_version=$(grep -oP 'php\K[0-9]+\.[0-9]+' "$file" | head -n1)
+            fi
+            
+            vhosts+=("$basename:true:$server_name:$ssl_enabled:$php_version")
         done
     fi
     
@@ -419,13 +446,13 @@ action_vhost_list() {
         echo -n "["
         local first=true
         for vhost in "${vhosts[@]}"; do
-            IFS=':' read -r filename enabled <<< "$vhost"
+            IFS=':' read -r filename enabled server_name ssl_enabled php_version <<< "$vhost"
             if [ "$first" = true ]; then
                 first=false
             else
                 echo -n ","
             fi
-            echo -n "{\"filename\":\"$filename\",\"enabled\":$enabled}"
+            echo -n "{\"filename\":\"$filename\",\"enabled\":$enabled,\"server_name\":\"$server_name\",\"ssl\":$ssl_enabled,\"php_version\":\"$php_version\"}"
         done
         echo "]"
     else
@@ -768,16 +795,32 @@ action_vhost_update_php() {
         exit 1
     fi
     
-    # Remove existing PHP-FPM configuration
-    sed -i '/# PHP-FPM Configuration/,/SetHandler.*php.*fpm/d' "$config_file"
-    sed -i '/<FilesMatch.*php/,/<\/FilesMatch>/d' "$config_file"
+    # Remove existing PHP-FPM configuration (all occurrences)
+    # First pass: remove PHP-FPM comment and SetHandler lines
+    sed -i '/# PHP-FPM Configuration/d' "$config_file"
+    sed -i '/SetHandler.*proxy:unix:.*php.*fpm/d' "$config_file"
+    
+    # Second pass: remove orphaned FilesMatch tags
+    sed -i '/<FilesMatch \\\.php\$/d' "$config_file"
+    sed -i '/<\/FilesMatch>/d' "$config_file"
     
     # If php_version is provided and not empty, add new configuration
     if [ -n "$php_version" ]; then
-        # Add new PHP-FPM configuration before </VirtualHost>
-        local php_config="    # PHP-FPM Configuration\n    <FilesMatch \.php$>\n        SetHandler \"proxy:unix:/run/php/php${php_version}-fpm.sock|fcgi://localhost\"\n    </FilesMatch>"
+        # Create temporary file with new configuration
+        local temp_file=$(mktemp)
         
-        sed -i "s|</VirtualHost>|$php_config\n</VirtualHost>|" "$config_file"
+        # Read file and insert PHP configuration before </VirtualHost>
+        awk -v php_ver="$php_version" '
+        /<\/VirtualHost>/ {
+            print "    # PHP-FPM Configuration"
+            print "    <FilesMatch \\.php$>"
+            print "        SetHandler \"proxy:unix:/run/php/php" php_ver "-fpm.sock|fcgi://localhost\""
+            print "    </FilesMatch>"
+        }
+        { print }
+        ' "$config_file" > "$temp_file"
+        
+        mv "$temp_file" "$config_file"
         
         echo "PHP version updated to $php_version for $filename"
     else
@@ -786,9 +829,13 @@ action_vhost_update_php() {
     
     # Reload Apache
     local service_name=$(get_service_name)
-    systemctl reload "$service_name" 2>&1
-    
-    exit 0
+    if systemctl reload "$service_name" 2>&1; then
+        echo "Apache reloaded successfully"
+        exit 0
+    else
+        echo "ERROR: Failed to reload Apache"
+        exit 1
+    fi
 }
 
 ################################################################################
@@ -881,6 +928,250 @@ action_php_switch() {
         echo "PHP version switching not supported on this OS"
     fi
     
+    exit 0
+}
+
+################################################################################
+# PHP MODULE MANAGEMENT
+################################################################################
+
+action_php_module_installed() {
+    if [ "$OS_TYPE" = "debian" ]; then
+        # Check if any PHP Apache module is installed
+        if dpkg -l | grep -q "^ii.*libapache2-mod-php"; then
+            echo "true"
+        else
+            echo "false"
+        fi
+    elif [ "$OS_TYPE" = "fedora" ]; then
+        # Check if PHP module is installed
+        if rpm -q php >/dev/null 2>&1; then
+            echo "true"
+        else
+            echo "false"
+        fi
+    else
+        echo "false"
+    fi
+    exit 0
+}
+
+action_php_module_install() {
+    local version="$1"
+    
+    if [ "$OS_TYPE" = "debian" ]; then
+        # If no version specified, detect available PHP versions
+        if [ -z "$version" ]; then
+            # Try to get the highest installed PHP version
+            version=$(php -v 2>/dev/null | head -n1 | grep -oP '\d+\.\d+' | head -n1)
+            
+            # If no PHP found, use default
+            if [ -z "$version" ]; then
+                version="8.3"
+            fi
+        fi
+        
+        echo "Installing PHP $version Apache module..."
+        
+        # Install PHP Apache module
+        apt-get update -qq 2>&1
+        apt-get install -y "libapache2-mod-php${version}" 2>&1
+        
+        # Restart Apache
+        local service_name=$(get_service_name)
+        systemctl restart "$service_name" 2>&1
+        
+        echo "PHP $version Apache module installed successfully"
+    elif [ "$OS_TYPE" = "fedora" ]; then
+        # Fedora: Install PHP
+        dnf install -y php 2>&1
+        
+        # Restart Apache
+        local service_name=$(get_service_name)
+        systemctl restart "$service_name" 2>&1
+        
+        echo "PHP Apache module installed successfully"
+    else
+        echo "ERROR: PHP module installation not supported on this OS"
+        exit 1
+    fi
+    exit 0
+}
+
+action_php_module_uninstall() {
+    local version="$1"
+    
+    if [ "$OS_TYPE" = "debian" ]; then
+        if [ -z "$version" ]; then
+            # Remove all PHP Apache modules
+            apt-get remove -y libapache2-mod-php* 2>&1
+        else
+            # Remove specific version
+            apt-get remove -y "libapache2-mod-php${version}" 2>&1
+        fi
+        
+        # Restart Apache
+        local service_name=$(get_service_name)
+        systemctl restart "$service_name" 2>&1
+        
+        echo "PHP Apache module uninstalled successfully"
+    elif [ "$OS_TYPE" = "fedora" ]; then
+        dnf remove -y php 2>&1
+        
+        # Restart Apache
+        local service_name=$(get_service_name)
+        systemctl restart "$service_name" 2>&1
+        
+        echo "PHP Apache module uninstalled successfully"
+    else
+        echo "ERROR: PHP module uninstallation not supported on this OS"
+        exit 1
+    fi
+    exit 0
+}
+
+################################################################################
+# APACHE MODULES MANAGEMENT
+################################################################################
+
+action_module_list() {
+    local format="$1"
+    
+    if [ "$OS_TYPE" = "debian" ]; then
+        # Get all available modules
+        local available_modules=()
+        local enabled_modules=()
+        
+        # List available modules
+        if [ -d "/etc/apache2/mods-available" ]; then
+            for mod_file in /etc/apache2/mods-available/*.load; do
+                if [ -f "$mod_file" ]; then
+                    local mod_name=$(basename "$mod_file" .load)
+                    available_modules+=("$mod_name")
+                fi
+            done
+        fi
+        
+        # List enabled modules
+        if [ -d "/etc/apache2/mods-enabled" ]; then
+            for mod_file in /etc/apache2/mods-enabled/*.load; do
+                if [ -f "$mod_file" ]; then
+                    local mod_name=$(basename "$mod_file" .load)
+                    enabled_modules+=("$mod_name")
+                fi
+            done
+        fi
+        
+        if [ "$format" = "--json" ]; then
+            # JSON output
+            echo "["
+            local first=true
+            for mod in "${available_modules[@]}"; do
+                if [ "$first" = true ]; then
+                    first=false
+                else
+                    echo ","
+                fi
+                
+                local enabled=false
+                for enabled_mod in "${enabled_modules[@]}"; do
+                    if [ "$mod" = "$enabled_mod" ]; then
+                        enabled=true
+                        break
+                    fi
+                done
+                
+                # Get module description
+                local description=""
+                case "$mod" in
+                    ssl) description="SSL/TLS support for encrypted connections" ;;
+                    rewrite) description="URL rewriting engine" ;;
+                    headers) description="HTTP header control" ;;
+                    proxy) description="Proxy/Gateway functionality" ;;
+                    proxy_http) description="HTTP proxy support" ;;
+                    proxy_fcgi) description="FastCGI proxy support" ;;
+                    php*) description="PHP module for Apache" ;;
+                    deflate) description="Compress content before delivery" ;;
+                    expires) description="Control cache expiration" ;;
+                    dir) description="Directory index handling" ;;
+                    mime) description="MIME type handling" ;;
+                    authz_core) description="Core authorization" ;;
+                    authz_host) description="Host-based authorization" ;;
+                    authn_core) description="Core authentication" ;;
+                    authn_file) description="File-based authentication" ;;
+                    access_compat) description="Access compatibility" ;;
+                    alias) description="URL aliasing" ;;
+                    env) description="Environment variable control" ;;
+                    filter) description="Smart filtering" ;;
+                    negotiation) description="Content negotiation" ;;
+                    setenvif) description="Set environment based on request" ;;
+                    status) description="Server status information" ;;
+                    *) description="Apache module" ;;
+                esac
+                
+                echo -n "  {\"name\":\"$mod\",\"enabled\":$enabled,\"description\":\"$description\"}"
+            done
+            echo ""
+            echo "]"
+        else
+            # Plain text output
+            echo "Available Apache Modules:"
+            echo "========================="
+            for mod in "${available_modules[@]}"; do
+                local status="[ ]"
+                for enabled_mod in "${enabled_modules[@]}"; do
+                    if [ "$mod" = "$enabled_mod" ]; then
+                        status="[✓]"
+                        break
+                    fi
+                done
+                echo "$status $mod"
+            done
+        fi
+    else
+        echo "ERROR: Module listing not supported on this OS"
+        exit 1
+    fi
+    exit 0
+}
+
+action_module_enable() {
+    local module_name="$1"
+    
+    if [ -z "$module_name" ]; then
+        echo "ERROR: module name is required"
+        exit 1
+    fi
+    
+    if [ "$OS_TYPE" = "debian" ]; then
+        a2enmod "$module_name" 2>&1
+        local service_name=$(get_service_name)
+        systemctl restart "$service_name" 2>&1
+        echo "Module $module_name enabled successfully"
+    else
+        echo "ERROR: Module management not supported on this OS"
+        exit 1
+    fi
+    exit 0
+}
+
+action_module_disable() {
+    local module_name="$1"
+    
+    if [ -z "$module_name" ]; then
+        echo "ERROR: module name is required"
+        exit 1
+    fi
+    
+    if [ "$OS_TYPE" = "debian" ]; then
+        a2dismod "$module_name" 2>&1
+        local service_name=$(get_service_name)
+        systemctl restart "$service_name" 2>&1
+        echo "Module $module_name disabled successfully"
+    else
+        echo "ERROR: Module management not supported on this OS"
+        exit 1
+    fi
     exit 0
 }
 
@@ -1019,10 +1310,18 @@ main() {
         vhost-details)      action_vhost_details "$@" ;;
         vhost-update-php)   action_vhost_update_php "$@" ;;
         
+        # Module management
+        module-list)        action_module_list "$@" ;;
+        module-enable)      action_module_enable "$@" ;;
+        module-disable)     action_module_disable "$@" ;;
+        
         # PHP management
-        php-list-versions)  action_php_list_versions "$@" ;;
-        php-get-active)     action_php_get_active ;;
-        php-switch)         action_php_switch "$@" ;;
+        php-list-versions)    action_php_list_versions "$@" ;;
+        php-get-active)       action_php_get_active ;;
+        php-switch)           action_php_switch "$@" ;;
+        php-module-installed) action_php_module_installed ;;
+        php-module-install)   action_php_module_install "$@" ;;
+        php-module-uninstall) action_php_module_uninstall "$@" ;;
         
         # SSL management
         ssl-is-enabled)     action_ssl_is_enabled ;;
@@ -1048,6 +1347,11 @@ SERVICE MANAGEMENT:
   enable                    Enable Apache autostart
   disable                   Disable Apache autostart
 
+MODULE MANAGEMENT:
+  module-list [--json]      List all Apache modules with status
+  module-enable <module>    Enable an Apache module
+  module-disable <module>   Disable an Apache module
+
 VIRTUAL HOST MANAGEMENT:
   vhost-list [--json]                           List all virtual hosts
   vhost-create <domain> <docroot> [--ssl]       Create new virtual host
@@ -1061,6 +1365,9 @@ PHP MANAGEMENT:
   php-list-versions [--json]    List installed PHP versions
   php-get-active                Get active PHP version
   php-switch <version>          Switch PHP version
+  php-module-installed          Check if PHP module is installed
+  php-module-install [version]  Install PHP Apache module
+  php-module-uninstall [ver]    Uninstall PHP Apache module
 
 SSL MANAGEMENT:
   ssl-is-enabled                Check if SSL module is enabled
