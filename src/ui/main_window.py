@@ -652,6 +652,54 @@ class MainWindow(Adw.ApplicationWindow):
         logger.info(f"Toast: {message}")
         print(f"📢 {message}")
     
+    def _show_sudo_password_dialog(self, callback):
+        """Show sudo password dialog and call callback with password"""
+        dialog = Adw.MessageDialog.new(self)
+        dialog.set_heading(_("Administrator Password Required"))
+        dialog.set_body(_("MySQL operations require administrator privileges. Please enter your password."))
+        
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("ok", _("OK"))
+        dialog.set_response_appearance("ok", Adw.ResponseAppearance.SUGGESTED)
+        dialog.set_default_response("ok")
+        
+        # Password entry
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        content_box.set_spacing(12)
+        content_box.set_margin_top(12)
+        content_box.set_margin_bottom(12)
+        content_box.set_margin_start(12)
+        content_box.set_margin_end(12)
+        
+        password_entry = Adw.PasswordEntryRow()
+        password_entry.set_title(_("Password"))
+        password_entry.set_show_apply_button(False)
+        
+        content_box.append(password_entry)
+        dialog.set_extra_child(content_box)
+        
+        def on_response(dialog, response):
+            if response == "ok":
+                password = password_entry.get_text()
+                if password:
+                    callback(password)
+                else:
+                    self._show_toast(_("Password is required"))
+                    # Show dialog again
+                    GLib.timeout_add(100, lambda: self._show_sudo_password_dialog(callback))
+            dialog.close()
+        
+        dialog.connect("response", on_response)
+        
+        # Enter key aktivasyonu
+        def on_entry_activate(entry):
+            dialog.response("ok")
+        
+        password_entry.connect("entry-activated", on_entry_activate)
+        
+        dialog.present()
+        password_entry.grab_focus()
+    
     # ==================== NAVIGATION ====================
     
     def _on_service_row_activated(self, listbox, row):
@@ -671,19 +719,72 @@ class MainWindow(Adw.ApplicationWindow):
         """Show service detail page"""
         self.current_service = service
         
+        # MySQL için özel durum - sudo şifresi gerekli olup olmadığını kontrol et
+        if service.name == 'mysql' and service.is_installed() and service.is_running():
+            try:
+                # Saved password var mı kontrol et
+                saved_password = service._get_saved_root_password()
+                if not saved_password:
+                    # Sudo gerekli, şifre iste
+                    def on_password_provided(password):
+                        # Şifreyi geçici olarak environment'a kaydet
+                        import os
+                        
+                        # SUDO_ASKPASS script oluştur
+                        temp_script = f"/tmp/orkesta_sudo_{os.getpid()}.sh"
+                        try:
+                            with open(temp_script, 'w') as f:
+                                f.write(f'#!/bin/bash\necho "{password}"\n')
+                            os.chmod(temp_script, 0o700)
+                            
+                            # Environment'ı geçici olarak değiştir
+                            old_askpass = os.environ.get('SUDO_ASKPASS')
+                            os.environ['SUDO_ASKPASS'] = temp_script
+                            
+                            # Normal detay sayfası akışını çağır
+                            self._create_and_show_detail_page_normal(service)
+                            
+                        finally:
+                            # Cleanup
+                            if old_askpass:
+                                os.environ['SUDO_ASKPASS'] = old_askpass
+                            elif 'SUDO_ASKPASS' in os.environ:
+                                del os.environ['SUDO_ASKPASS']
+                            try:
+                                os.remove(temp_script)
+                            except:
+                                pass
+                    
+                    self._show_sudo_password_dialog(on_password_provided)
+                    return
+            except Exception as e:
+                logger.error(f"Error checking MySQL auth: {e}")
+        
+        # Normal detay sayfası oluştur
+        self._create_and_show_detail_page_normal(service)
+    
+    def _create_and_show_detail_page_normal(self, service):
+        """Normal detail page creation"""
         # Detay sayfası oluştur
         detail_page = self._create_service_detail_page(service)
         
-        # Eski detay sayfasını kaldır (varsa)
-        old_detail = self.main_stack.get_child_by_name("detail")
-        if old_detail:
-            self.main_stack.remove(old_detail)
+        # Eski detay sayfasını kaldır (varsa) - basit yöntem
+        try:
+            old_detail = self.main_stack.get_child_by_name("detail")
+            if old_detail:
+                self.main_stack.remove(old_detail)
+        except:
+            # GTK API farklılığında sessizce devam et
+            pass
         
         # Yeni detay sayfasını ekle
-        self.main_stack.add_named(detail_page, "detail")
+        try:
+            self.main_stack.add_named(detail_page, "detail")
+            self.main_stack.set_visible_child_name("detail")
+        except:
+            # Fallback - direkt göster
+            self.main_stack.set_visible_child(detail_page)
         
-        # Detay sayfasına geç
-        self.main_stack.set_visible_child_name("detail")
         self.back_button.set_visible(True)
     
     def _refresh_detail_page(self):
@@ -826,6 +927,10 @@ class MainWindow(Adw.ApplicationWindow):
         if service.name == "mysql" and service.is_installed():
             self._add_mysql_sections(main_box, service)
         
+        # PHP specific sections
+        if service.name == "php" and service.is_installed():
+            self._add_php_sections(main_box, service)
+        
         # Configuration section (placeholder)
         config_group = Adw.PreferencesGroup()
         config_group.set_title(_("Configuration"))
@@ -849,24 +954,45 @@ class MainWindow(Adw.ApplicationWindow):
         mysql_info_group.set_title(_("MySQL Status"))
         
         try:
-            mysql_info = service.get_mysql_status_info()
+            # Basic info without sudo (just check if running/installed)
+            mysql_info = {
+                'installed': service.is_installed(),
+                'running': service.is_running(),
+                'databases_count': 0,
+                'users_count': 0,
+                'root_access': False,
+                'auth_method': 'Unknown'
+            }
             
-            # Root access status
-            root_access_row = Adw.ActionRow()
-            root_access_row.set_title(_("Root Access"))
-            if mysql_info.get('root_access', False):
-                if mysql_info.get('auth_method') == 'Unix Socket (sudo mysql)':
-                    root_status_label = Gtk.Label(label="🔓 Unix Socket (sudo)")
-                    root_status_label.add_css_class("success")
-                else:
-                    root_status_label = Gtk.Label(label="🔐 Password Auth")
-                    root_status_label.add_css_class("success")
+            # If MySQL is running, try to get detailed info
+            if service.is_running():
+                # Check if we need sudo
+                try:
+                    # Try to get info without sudo first
+                    detailed_info = service.get_mysql_status_info()
+                    mysql_info.update(detailed_info)
+                except Exception as e:
+                    # If it fails, it probably needs sudo
+                    logger.warning(f"MySQL info needs sudo: {e}")
+                    # We'll show a button to load detailed info with sudo
+            
+            # If we couldn't get detailed info, show a button to load it with sudo
+            if mysql_info.get('databases_count') == 0 and mysql_info.get('users_count') == 0:
+                load_info_row = Adw.ActionRow()
+                load_info_row.set_title(_("Load MySQL Details"))
+                load_info_row.set_subtitle(_("Click to load database and user information"))
+                load_info_row.set_activatable(True)
+                
+                def load_mysql_info(row):
+                    self._load_mysql_info_with_sudo(service, main_box, mysql_info_group)
+                
+                load_info_row.connect("activated", load_mysql_info)
+                load_icon = Gtk.Image.new_from_icon_name("view-refresh-symbolic")
+                load_info_row.add_prefix(load_icon)
+                mysql_info_group.add(load_info_row)
             else:
-                root_status_label = Gtk.Label(label="🔒 Access Denied")
-                root_status_label.add_css_class("error")
-            
-            root_access_row.add_suffix(root_status_label)
-            mysql_info_group.add(root_access_row)
+                # Show detailed info
+                self._show_mysql_detailed_info(mysql_info_group, mysql_info, service)
             
             # Root password/method display
             auth_row = Adw.ActionRow()
@@ -897,13 +1023,27 @@ class MainWindow(Adw.ApplicationWindow):
             version_row.add_suffix(version_label)
             mysql_info_group.add(version_row)
             
-            # Database count
+            # Database count (clickable to show list)
             db_count_row = Adw.ActionRow()
             db_count_row.set_title(_("Databases"))
+            db_count_row.set_subtitle(_("Click to view database list"))
             db_count_label = Gtk.Label(label=str(mysql_info.get('databases_count', 0)))
             db_count_label.add_css_class("monospace")
             db_count_row.add_suffix(db_count_label)
+            db_count_row.set_activatable(True)
+            db_count_row.connect("activated", lambda r: self._show_mysql_databases(service, mysql_info.get('databases', [])))
             mysql_info_group.add(db_count_row)
+            
+            # Users count (clickable to show list)  
+            users_count_row = Adw.ActionRow()
+            users_count_row.set_title(_("Users"))
+            users_count_row.set_subtitle(_("Click to view user list"))
+            users_count_label = Gtk.Label(label=str(mysql_info.get('users_count', 0)))
+            users_count_label.add_css_class("monospace")
+            users_count_row.add_suffix(users_count_label)
+            users_count_row.set_activatable(True)
+            users_count_row.connect("activated", lambda r: self._show_mysql_users(service, mysql_info.get('users', [])))
+            mysql_info_group.add(users_count_row)
             
         except Exception as e:
             logger.error(f"Error getting MySQL info: {e}")
@@ -915,83 +1055,102 @@ class MainWindow(Adw.ApplicationWindow):
             mysql_info_group.add(error_row)
         
         main_box.append(mysql_info_group)
+    
+    def _load_mysql_info_with_sudo(self, service, main_box, mysql_info_group):
+        """Load MySQL detailed info with sudo password"""
+        def on_password_provided(password):
+            try:
+                # Get detailed info with sudo
+                detailed_info = service.get_mysql_status_info()
+                
+                # Clear the current group and rebuild with detailed info
+                # Remove the load button and add detailed info
+                child = mysql_info_group.get_first_child()
+                while child:
+                    next_child = child.get_next_sibling()
+                    mysql_info_group.remove(child)
+                    child = next_child
+                
+                # Add detailed info
+                self._show_mysql_detailed_info(mysql_info_group, detailed_info, service)
+                
+                self._show_toast(_("MySQL information loaded successfully"))
+                
+            except Exception as e:
+                logger.error(f"Error loading MySQL info with sudo: {e}")
+                self._show_toast(_("Failed to load MySQL information"))
         
-        # MySQL Management Actions
-        mysql_actions_group = Adw.PreferencesGroup()
-        mysql_actions_group.set_title(_("MySQL Management"))
+        self._show_sudo_password_dialog(on_password_provided)
+    
+    def _show_mysql_detailed_info(self, mysql_info_group, mysql_info, service):
+        """Show detailed MySQL information"""
+        # Root access status
+        root_access_row = Adw.ActionRow()
+        root_access_row.set_title(_("Root Access"))
+        if mysql_info.get('root_access', False):
+            if mysql_info.get('auth_method') == 'Unix Socket (sudo mysql)':
+                root_status_label = Gtk.Label(label="🔓 Unix Socket (sudo)")
+                root_status_label.add_css_class("success")
+            else:
+                root_status_label = Gtk.Label(label="🔐 Password Auth")
+                root_status_label.add_css_class("success")
+        else:
+            root_status_label = Gtk.Label(label="🔒 Access Denied")
+            root_status_label.add_css_class("error")
         
-        # Change root password
-        password_row = Adw.ActionRow()
-        password_row.set_title(_("Change Root Password"))
-        password_row.set_subtitle(_("Set or change MySQL root password"))
-        password_row.set_activatable(True)
-        password_row.connect("activated", lambda r: self._on_mysql_change_password(service))
-        password_icon = Gtk.Image.new_from_icon_name("dialog-password-symbolic")
-        password_row.add_prefix(password_icon)
-        mysql_actions_group.add(password_row)
+        root_access_row.add_suffix(root_status_label)
+        mysql_info_group.add(root_access_row)
         
-        # Secure installation
-        secure_row = Adw.ActionRow()
-        secure_row.set_title(_("Secure Installation"))
-        secure_row.set_subtitle(_("Run mysql_secure_installation"))
-        secure_row.set_activatable(True)
-        secure_row.connect("activated", lambda r: self._on_mysql_secure_installation(service))
-        secure_icon = Gtk.Image.new_from_icon_name("security-high-symbolic")
-        secure_row.add_prefix(secure_icon)
-        mysql_actions_group.add(secure_row)
+        # Database count (clickable to show list)
+        db_count_row = Adw.ActionRow()
+        db_count_row.set_title(_("Databases"))
+        db_count_row.set_subtitle(_("Click to view database list"))
+        db_count_label = Gtk.Label(label=str(mysql_info.get('databases_count', 0)))
+        db_count_label.add_css_class("monospace")
+        db_count_row.add_suffix(db_count_label)
+        db_count_row.set_activatable(True)
+        db_count_row.connect("activated", lambda r: self._show_mysql_databases(service, mysql_info.get('databases', [])))
+        mysql_info_group.add(db_count_row)
         
-        # Create database
-        create_db_row = Adw.ActionRow()
-        create_db_row.set_title(_("Create Database"))
-        create_db_row.set_subtitle(_("Create a new database"))
-        create_db_row.set_activatable(True)
-        create_db_row.connect("activated", lambda r: self._on_mysql_create_database(service))
-        create_db_icon = Gtk.Image.new_from_icon_name("list-add-symbolic")
-        create_db_row.add_prefix(create_db_icon)
-        mysql_actions_group.add(create_db_row)
-        
-        # Create user
-        create_user_row = Adw.ActionRow()
-        create_user_row.set_title(_("Create User"))
-        create_user_row.set_subtitle(_("Create a new MySQL user"))
-        create_user_row.set_activatable(True)
-        create_user_row.connect("activated", lambda r: self._on_mysql_create_user(service))
-        create_user_icon = Gtk.Image.new_from_icon_name("system-users-symbolic")
-        create_user_row.add_prefix(create_user_icon)
-        mysql_actions_group.add(create_user_row)
-        
-        main_box.append(mysql_actions_group)
+        # Users count (clickable to show list)  
+        users_count_row = Adw.ActionRow()
+        users_count_row.set_title(_("Users"))
+        users_count_row.set_subtitle(_("Click to view user list"))
+        users_count_label = Gtk.Label(label=str(mysql_info.get('users_count', 0)))
+        users_count_label.add_css_class("monospace")
+        users_count_row.add_suffix(users_count_label)
+        users_count_row.set_activatable(True)
+        users_count_row.connect("activated", lambda r: self._show_mysql_users(service, mysql_info.get('users', [])))
+        mysql_info_group.add(users_count_row)
+        connection_info_row = Adw.ActionRow()
+        connection_info_row.set_title(_("Connection Information"))
+        connection_info_row.set_subtitle(_("Show connection details for client applications"))
+        connection_info_row.set_activatable(True)
+        connection_info_row.connect("activated", lambda r: self._on_mysql_connection_info(service))
+
     
     def _on_mysql_change_password(self, service):
         """MySQL root password change dialog"""
-        dialog = Adw.MessageDialog.new(self, _("Change MySQL Root Password"), None)
-        dialog.set_body(_("Enter the current and new passwords for MySQL root user"))
+        dialog = Adw.MessageDialog.new(self, _("Set MySQL Root Password"), None)
+        dialog.set_body(_("Set a new password for MySQL root user. Current password is not required."))
         
         # Create form
         form_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         form_box.set_spacing(12)
         form_box.set_margin_top(12)
         
-        # Current password
-        current_label = Gtk.Label(label=_("Current Password (leave empty if none):"))
-        current_label.set_halign(Gtk.Align.START)
-        current_entry = Gtk.PasswordEntry()
-        current_entry.set_property("placeholder-text", "Current password")
-        
         # New password
         new_label = Gtk.Label(label=_("New Password:"))
         new_label.set_halign(Gtk.Align.START)
         new_entry = Gtk.PasswordEntry()
-        new_entry.set_property("placeholder-text", "New password")
+        new_entry.set_property("placeholder-text", "Enter new password")
         
         # Confirm password
-        confirm_label = Gtk.Label(label=_("Confirm New Password:"))
+        confirm_label = Gtk.Label(label=_("Confirm Password:"))
         confirm_label.set_halign(Gtk.Align.START)
         confirm_entry = Gtk.PasswordEntry()
         confirm_entry.set_property("placeholder-text", "Confirm new password")
         
-        form_box.append(current_label)
-        form_box.append(current_entry)
         form_box.append(new_label)
         form_box.append(new_entry)
         form_box.append(confirm_label)
@@ -999,32 +1158,32 @@ class MainWindow(Adw.ApplicationWindow):
         
         dialog.set_extra_child(form_box)
         dialog.add_response("cancel", _("Cancel"))
-        dialog.add_response("change", _("Change Password"))
+        dialog.add_response("change", _("Set Password"))
         dialog.set_response_appearance("change", Adw.ResponseAppearance.SUGGESTED)
         
         def on_response(dialog, response):
             if response == "change":
-                current_password = current_entry.get_text()
                 new_password = new_entry.get_text()
                 confirm_password = confirm_entry.get_text()
                 
                 if not new_password:
-                    self._show_toast(_("New password cannot be empty"))
+                    self._show_toast(_("Password cannot be empty"))
                     return
                 
                 if new_password != confirm_password:
                     self._show_toast(_("Passwords do not match"))
                     return
                 
-                # Change password
-                success, message = service.set_root_password(new_password, current_password)
-                self._show_toast(message)
+                # Reset password (no current password needed)
+                self._run_service_action_with_progress(
+                    service,
+                    lambda: service.reset_root_password(new_password),
+                    _("Setting MySQL root password..."),
+                    _("MySQL root password set successfully!"),
+                    _("Failed to set MySQL root password")
+                )
                 
-                if success:
-                    dialog.close()
-                    # Refresh detail page
-                    if self.current_service and self.current_service.name == service.name:
-                        self._refresh_detail_page()
+                dialog.close()
         
         dialog.connect("response", on_response)
         dialog.present()
@@ -1085,14 +1244,31 @@ class MainWindow(Adw.ApplicationWindow):
                     self._show_toast(_("Database name cannot be empty"))
                     return
                 
-                success, message = service.create_database(db_name)
-                self._show_toast(message)
+                dialog.close()
                 
-                if success:
-                    dialog.close()
-                    # Refresh detail page
-                    if self.current_service and self.current_service.name == service.name:
-                        self._refresh_detail_page()
+                # Check if we need sudo password
+                mysql_info = service.get_mysql_status_info()
+                if mysql_info.get('auth_method') == 'Unix Socket (sudo mysql)':
+                    # Need sudo password
+                    def on_password_provided(sudo_password):
+                        success, message = service.create_database(db_name, sudo_password=sudo_password)
+                        self._show_toast(message)
+                        
+                        if success:
+                            # Refresh detail page
+                            if self.current_service and self.current_service.name == service.name:
+                                self._refresh_detail_page()
+                    
+                    self._show_sudo_password_dialog(on_password_provided)
+                else:
+                    # Use existing password
+                    success, message = service.create_database(db_name)
+                    self._show_toast(message)
+                    
+                    if success:
+                        # Refresh detail page
+                        if self.current_service and self.current_service.name == service.name:
+                            self._refresh_detail_page()
         
         dialog.connect("response", on_response)
         dialog.present()
@@ -1148,17 +1324,270 @@ class MainWindow(Adw.ApplicationWindow):
                     self._show_toast(_("Username and password are required"))
                     return
                 
-                success, message = service.create_user(username, password, host)
-                self._show_toast(message)
+                dialog.close()
                 
-                if success:
-                    dialog.close()
-                    # Refresh detail page
-                    if self.current_service and self.current_service.name == service.name:
-                        self._refresh_detail_page()
+                # Check if we need sudo password
+                mysql_info = service.get_mysql_status_info()
+                if mysql_info.get('auth_method') == 'Unix Socket (sudo mysql)':
+                    # Need sudo password
+                    def on_password_provided(sudo_password):
+                        success, message = service.create_user(username, password, host, sudo_password=sudo_password)
+                        self._show_toast(message)
+                        
+                        if success:
+                            # Refresh detail page
+                            if self.current_service and self.current_service.name == service.name:
+                                self._refresh_detail_page()
+                    
+                    self._show_sudo_password_dialog(on_password_provided)
+                else:
+                    # Use existing password
+                    success, message = service.create_user(username, password, host)
+                    self._show_toast(message)
+                    
+                    if success:
+                        # Refresh detail page
+                        if self.current_service and self.current_service.name == service.name:
+                            self._refresh_detail_page()
         
         dialog.connect("response", on_response)
         dialog.present()
+    
+    def _on_mysql_setup_clients(self, service):
+        """Setup MySQL for client applications"""
+        dialog = Adw.MessageDialog.new(self, _("Setup MySQL for Client Applications"), None)
+        dialog.set_body(_("This will configure MySQL to work with external client applications like Navicat, DBGate, and phpMyAdmin."))
+        
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("setup", _("Setup"))
+        dialog.set_response_appearance("setup", Adw.ResponseAppearance.SUGGESTED)
+        
+        def on_response(dialog, response):
+            if response == "setup":
+                self._run_service_action_with_progress(
+                    service, 
+                    lambda: service.setup_for_clients(),
+                    _("Setting up MySQL for client applications..."),
+                    _("MySQL client setup completed successfully!"),
+                    _("Failed to setup MySQL for client applications")
+                )
+        
+        dialog.connect("response", on_response)
+        dialog.present()
+    
+    def _on_mysql_connection_info(self, service):
+        """Show MySQL connection information"""
+        dialog = Adw.MessageDialog.new(self, _("MySQL Connection Information"), None)
+        
+        try:
+            # Get connection info
+            connection_info = service.get_connection_info()
+            
+            info_text = ""
+            
+            if connection_info.get('running', False):
+                # TCP Connection info
+                tcp_info = connection_info.get('tcp_connection', {})
+                info_text += f"🌐 **TCP Connection (for client apps):**\n"
+                info_text += f"   Host: {tcp_info.get('host', 'localhost')}\n"
+                info_text += f"   Port: {tcp_info.get('port', 3306)}\n"
+                info_text += f"   Username: {tcp_info.get('username', 'root')}\n"
+                
+                if tcp_info.get('password'):
+                    info_text += f"   Password: {tcp_info.get('password')}\n"
+                else:
+                    info_text += f"   Password: (Set password first)\n"
+                
+                info_text += f"\n🔌 **Socket Connection:**\n"
+                socket_info = connection_info.get('socket_connection', {})
+                info_text += f"   Socket: {socket_info.get('socket_path', '/var/run/mysqld/mysqld.sock')}\n"
+                info_text += f"   Legacy: {socket_info.get('legacy_socket', '/tmp/mysql.sock')}\n"
+                
+                info_text += f"\n📱 **Client Applications:**\n"
+                client_apps = connection_info.get('client_apps', {})
+                
+                # Navicat
+                navicat = client_apps.get('navicat', {})
+                info_text += f"   **Navicat:**\n"
+                info_text += f"   • Connection Type: {navicat.get('connection_type', 'MySQL')}\n"
+                info_text += f"   • Host: {navicat.get('host', 'localhost')}\n"
+                info_text += f"   • Port: {navicat.get('port', 3306)}\n"
+                info_text += f"   • Username: {navicat.get('username', 'root')}\n"
+                
+                # DBGate
+                dbgate = client_apps.get('dbgate', {})
+                info_text += f"\n   **DBGate:**\n"
+                info_text += f"   • Engine: {dbgate.get('engine', 'mysql@dbgate-plugin-mysql')}\n"
+                info_text += f"   • Server: {dbgate.get('server', 'localhost')}\n"
+                info_text += f"   • Port: {dbgate.get('port', 3306)}\n"
+                info_text += f"   • User: {dbgate.get('user', 'root')}\n"
+            else:
+                info_text = "❌ MySQL service is not running.\nStart the service to view connection information."
+            
+            dialog.set_body(info_text)
+            
+        except Exception as e:
+            logger.error(f"Error getting connection info: {e}")
+            dialog.set_body(_("Error retrieving connection information"))
+        
+        dialog.add_response("close", _("Close"))
+        dialog.set_response_appearance("close", Adw.ResponseAppearance.SUGGESTED)
+        dialog.present()
+    
+    def _add_php_sections(self, main_box, service):
+        """Add PHP-specific sections to detail page"""
+        
+        try:
+            # Get PHP information
+            php_info = service.get_php_info()
+            config_info = service.get_config_info()
+            
+            # PHP Version Management
+            version_group = Adw.PreferencesGroup()
+            version_group.set_title(_("PHP Version Management"))
+            
+            # Active version
+            active_version_row = Adw.ActionRow()
+            active_version_row.set_title(_("Active Version"))
+            active_version = php_info.get('active_version', 'Unknown')
+            version_label = Gtk.Label(label=f"PHP {active_version}")
+            version_label.add_css_class("monospace")
+            active_version_row.add_suffix(version_label)
+            version_group.add(active_version_row)
+            
+            # Installed versions
+            installed_versions = php_info.get('installed_versions', [])
+            if len(installed_versions) > 1:
+                installed_row = Adw.ActionRow()
+                installed_row.set_title(_("Installed Versions"))
+                installed_row.set_subtitle(", ".join(installed_versions))
+                version_group.add(installed_row)
+            
+            # Available versions
+            available_versions = php_info.get('available_versions', [])
+            available_row = Adw.ActionRow()
+            available_row.set_title(_("Available Versions"))
+            available_row.set_subtitle(", ".join(available_versions))
+            version_group.add(available_row)
+            
+            main_box.append(version_group)
+            
+            # Version Actions
+            version_actions_group = Adw.PreferencesGroup()
+            version_actions_group.set_title(_("Version Actions"))
+            
+            # Install new version
+            install_version_row = Adw.ActionRow()
+            install_version_row.set_title(_("Install New Version"))
+            install_version_row.set_subtitle(_("Install additional PHP version"))
+            install_version_row.set_activatable(True)
+            install_version_row.connect("activated", lambda r: self._on_php_install_version(service, available_versions))
+            install_icon = Gtk.Image.new_from_icon_name("list-add-symbolic")
+            install_version_row.add_prefix(install_icon)
+            version_actions_group.add(install_version_row)
+            
+            # Switch version (if multiple versions available)
+            if len(installed_versions) > 1:
+                switch_version_row = Adw.ActionRow()
+                switch_version_row.set_title(_("Switch Version"))
+                switch_version_row.set_subtitle(_("Change active PHP version"))
+                switch_version_row.set_activatable(True)
+                switch_version_row.connect("activated", lambda r: self._on_php_switch_version(service, installed_versions))
+                switch_icon = Gtk.Image.new_from_icon_name("emblem-synchronizing-symbolic")
+                switch_version_row.add_prefix(switch_icon)
+                version_actions_group.add(switch_version_row)
+            
+            # Uninstall version (if multiple versions available)
+            if len(installed_versions) > 1:
+                uninstall_version_row = Adw.ActionRow()
+                uninstall_version_row.set_title(_("Uninstall Version"))
+                uninstall_version_row.set_subtitle(_("Remove a PHP version"))
+                uninstall_version_row.set_activatable(True)
+                uninstall_version_row.connect("activated", lambda r: self._on_php_uninstall_version(service, installed_versions))
+                uninstall_icon = Gtk.Image.new_from_icon_name("edit-delete-symbolic")
+                uninstall_version_row.add_prefix(uninstall_icon)
+                version_actions_group.add(uninstall_version_row)
+            
+            main_box.append(version_actions_group)
+            
+            # Extensions Management
+            extensions_group = Adw.PreferencesGroup()
+            extensions_group.set_title(_("Extensions"))
+            
+            # Get installed extensions
+            installed_extensions = service.get_installed_extensions()
+            popular_extensions = service.get_popular_extensions()
+            
+            # Extension count
+            ext_count_row = Adw.ActionRow()
+            ext_count_row.set_title(_("Installed Extensions"))
+            ext_count_label = Gtk.Label(label=str(len(installed_extensions)))
+            ext_count_label.add_css_class("monospace")
+            ext_count_row.add_suffix(ext_count_label)
+            extensions_group.add(ext_count_row)
+            
+            # Install extension
+            install_ext_row = Adw.ActionRow()
+            install_ext_row.set_title(_("Install Extension"))
+            install_ext_row.set_subtitle(_("Install a PHP extension"))
+            install_ext_row.set_activatable(True)
+            install_ext_row.connect("activated", lambda r: self._on_php_install_extension(service, popular_extensions, installed_extensions))
+            install_ext_icon = Gtk.Image.new_from_icon_name("list-add-symbolic")
+            install_ext_row.add_prefix(install_ext_icon)
+            extensions_group.add(install_ext_row)
+            
+            # Manage extensions
+            manage_ext_row = Adw.ActionRow()
+            manage_ext_row.set_title(_("Manage Extensions"))
+            manage_ext_row.set_subtitle(_("View and uninstall extensions"))
+            manage_ext_row.set_activatable(True)
+            manage_ext_row.connect("activated", lambda r: self._on_php_manage_extensions(service, installed_extensions))
+            manage_ext_icon = Gtk.Image.new_from_icon_name("preferences-system-symbolic")
+            manage_ext_row.add_prefix(manage_ext_icon)
+            extensions_group.add(manage_ext_row)
+            
+            main_box.append(extensions_group)
+            
+            # Configuration Information
+            config_group = Adw.PreferencesGroup()
+            config_group.set_title(_("Configuration"))
+            
+            # Config file location
+            if 'config_file' in config_info:
+                config_file_row = Adw.ActionRow()
+                config_file_row.set_title(_("Configuration File"))
+                config_file_row.set_subtitle(config_info['config_file'])
+                config_group.add(config_file_row)
+            
+            # Memory limit
+            if 'memory_limit' in config_info:
+                memory_row = Adw.ActionRow()
+                memory_row.set_title(_("Memory Limit"))
+                memory_label = Gtk.Label(label=config_info['memory_limit'])
+                memory_label.add_css_class("monospace")
+                memory_row.add_suffix(memory_label)
+                config_group.add(memory_row)
+            
+            # Upload max size
+            if 'upload_max_size' in config_info:
+                upload_row = Adw.ActionRow()
+                upload_row.set_title(_("Upload Max Size"))
+                upload_label = Gtk.Label(label=config_info['upload_max_size'])
+                upload_label.add_css_class("monospace")
+                upload_row.add_suffix(upload_label)
+                config_group.add(upload_row)
+            
+            main_box.append(config_group)
+            
+        except Exception as e:
+            logger.error(f"Error adding PHP sections: {e}")
+            error_group = Adw.PreferencesGroup()
+            error_group.set_title(_("PHP Information"))
+            error_row = Adw.ActionRow()
+            error_row.set_title(_("Error"))
+            error_row.set_subtitle(str(e))
+            error_group.add(error_row)
+            main_box.append(error_group)
     
     def _add_apache_sections(self, main_box, service):
         """Add Apache-specific sections to detail page"""
@@ -1850,3 +2279,631 @@ class MainWindow(Adw.ApplicationWindow):
     def _on_refresh_clicked(self, button):
         """Refresh button clicked"""
         self._load_services()
+    
+    # ==================== PHP EVENT HANDLERS ====================
+    
+    def _on_php_install_version(self, service, available_versions):
+        """Install new PHP version dialog"""
+        # Filter out already installed versions
+        php_info = service.get_php_info()
+        installed_versions = set(php_info.get('installed_versions', []))
+        installable_versions = [v for v in available_versions if v not in installed_versions]
+        
+        if not installable_versions:
+            self._show_toast(_("All available PHP versions are already installed"))
+            return
+        
+        dialog = Adw.MessageDialog.new(self, _("Install PHP Version"), None)
+        dialog.set_body(_("Select a PHP version to install"))
+        
+        # Version selector
+        list_box = Gtk.ListBox()
+        list_box.set_selection_mode(Gtk.SelectionMode.SINGLE)
+        list_box.add_css_class("boxed-list")
+        
+        selected_version = [None]
+        
+        for version in installable_versions:
+            row = Gtk.ListBoxRow()
+            box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+            box.set_spacing(12)
+            box.set_margin_top(8)
+            box.set_margin_bottom(8)
+            box.set_margin_start(12)
+            box.set_margin_end(12)
+            
+            label = Gtk.Label(label=f"PHP {version}")
+            label.set_hexpand(True)
+            label.set_halign(Gtk.Align.START)
+            box.append(label)
+            
+            row.set_child(box)
+            row.version = version
+            list_box.append(row)
+        
+        def on_row_activated(listbox, row):
+            selected_version[0] = row.version
+        
+        list_box.connect("row-activated", on_row_activated)
+        
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_child(list_box)
+        scrolled.set_min_content_height(200)
+        scrolled.set_margin_top(12)
+        
+        dialog.set_extra_child(scrolled)
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("install", _("Install"))
+        dialog.set_response_appearance("install", Adw.ResponseAppearance.SUGGESTED)
+        
+        def on_response(dialog, response):
+            if response == "install" and selected_version[0]:
+                version = selected_version[0]
+                dialog.close()
+                
+                # Show progress dialog
+                self._show_loading_dialog(f"Installing PHP {version}...")
+                
+                def install_thread():
+                    try:
+                        success, message = service.install_version(version)
+                        GLib.idle_add(self._on_operation_complete, success, message)
+                    except Exception as e:
+                        GLib.idle_add(self._on_operation_complete, False, str(e))
+                
+                import threading
+                threading.Thread(target=install_thread, daemon=True).start()
+        
+        dialog.connect("response", on_response)
+        dialog.present()
+    
+    def _on_php_switch_version(self, service, installed_versions):
+        """Switch PHP version dialog"""
+        dialog = Adw.MessageDialog.new(self, _("Switch PHP Version"), None)
+        dialog.set_body(_("Select the PHP version to activate"))
+        
+        # Get current active version
+        php_info = service.get_php_info()
+        current_version = php_info.get('active_version')
+        
+        # Version selector
+        list_box = Gtk.ListBox()
+        list_box.set_selection_mode(Gtk.SelectionMode.SINGLE)
+        list_box.add_css_class("boxed-list")
+        
+        selected_version = [current_version]
+        
+        for version in installed_versions:
+            row = Gtk.ListBoxRow()
+            box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+            box.set_spacing(12)
+            box.set_margin_top(8)
+            box.set_margin_bottom(8)
+            box.set_margin_start(12)
+            box.set_margin_end(12)
+            
+            label = Gtk.Label(label=f"PHP {version}")
+            label.set_hexpand(True)
+            label.set_halign(Gtk.Align.START)
+            box.append(label)
+            
+            if version == current_version:
+                check = Gtk.Image.new_from_icon_name("emblem-ok-symbolic")
+                check.add_css_class("success")
+                box.append(check)
+            
+            row.set_child(box)
+            row.version = version
+            list_box.append(row)
+        
+        def on_row_activated(listbox, row):
+            selected_version[0] = row.version
+        
+        list_box.connect("row-activated", on_row_activated)
+        
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_child(list_box)
+        scrolled.set_min_content_height(200)
+        scrolled.set_margin_top(12)
+        
+        dialog.set_extra_child(scrolled)
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("switch", _("Switch"))
+        dialog.set_response_appearance("switch", Adw.ResponseAppearance.SUGGESTED)
+        
+        def on_response(dialog, response):
+            if response == "switch" and selected_version[0]:
+                version = selected_version[0]
+                if version == current_version:
+                    self._show_toast(_("This version is already active"))
+                    return
+                
+                dialog.close()
+                
+                # Show progress dialog
+                self._show_loading_dialog(f"Switching to PHP {version}...")
+                
+                def switch_thread():
+                    try:
+                        success, message = service.switch_version(version)
+                        GLib.idle_add(self._on_operation_complete, success, message)
+                    except Exception as e:
+                        GLib.idle_add(self._on_operation_complete, False, str(e))
+                
+                import threading
+                threading.Thread(target=switch_thread, daemon=True).start()
+        
+        dialog.connect("response", on_response)
+        dialog.present()
+    
+    def _on_php_uninstall_version(self, service, installed_versions):
+        """Uninstall PHP version dialog"""
+        # Get current active version
+        php_info = service.get_php_info()
+        current_version = php_info.get('active_version')
+        
+        # Filter out active version (can't uninstall active version)
+        uninstallable_versions = [v for v in installed_versions if v != current_version]
+        
+        if not uninstallable_versions:
+            self._show_toast(_("Cannot uninstall the active PHP version"))
+            return
+        
+        dialog = Adw.MessageDialog.new(self, _("Uninstall PHP Version"), None)
+        dialog.set_body(_("Select a PHP version to uninstall. The active version cannot be uninstalled."))
+        
+        # Version selector
+        list_box = Gtk.ListBox()
+        list_box.set_selection_mode(Gtk.SelectionMode.SINGLE)
+        list_box.add_css_class("boxed-list")
+        
+        selected_version = [None]
+        
+        for version in uninstallable_versions:
+            row = Gtk.ListBoxRow()
+            box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+            box.set_spacing(12)
+            box.set_margin_top(8)
+            box.set_margin_bottom(8)
+            box.set_margin_start(12)
+            box.set_margin_end(12)
+            
+            label = Gtk.Label(label=f"PHP {version}")
+            label.set_hexpand(True)
+            label.set_halign(Gtk.Align.START)
+            box.append(label)
+            
+            row.set_child(box)
+            row.version = version
+            list_box.append(row)
+        
+        def on_row_activated(listbox, row):
+            selected_version[0] = row.version
+        
+        list_box.connect("row-activated", on_row_activated)
+        
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_child(list_box)
+        scrolled.set_min_content_height(200)
+        scrolled.set_margin_top(12)
+        
+        dialog.set_extra_child(scrolled)
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("uninstall", _("Uninstall"))
+        dialog.set_response_appearance("uninstall", Adw.ResponseAppearance.DESTRUCTIVE)
+        
+        def on_response(dialog, response):
+            if response == "uninstall" and selected_version[0]:
+                version = selected_version[0]
+                dialog.close()
+                
+                # Confirmation dialog
+                confirm_dialog = Adw.MessageDialog.new(self, _("Confirm Uninstall"), None)
+                confirm_dialog.set_body(_("Are you sure you want to uninstall PHP {version}? This action cannot be undone.").format(version=version))
+                confirm_dialog.add_response("cancel", _("Cancel"))
+                confirm_dialog.add_response("uninstall", _("Uninstall"))
+                confirm_dialog.set_response_appearance("uninstall", Adw.ResponseAppearance.DESTRUCTIVE)
+                
+                def on_confirm_response(dialog, response):
+                    if response == "uninstall":
+                        dialog.close()
+                        
+                        # Show progress dialog
+                        self._show_loading_dialog(f"Uninstalling PHP {version}...")
+                        
+                        def uninstall_thread():
+                            try:
+                                success, message = service.uninstall_version(version)
+                                GLib.idle_add(self._on_operation_complete, success, message)
+                            except Exception as e:
+                                GLib.idle_add(self._on_operation_complete, False, str(e))
+                        
+                        import threading
+                        threading.Thread(target=uninstall_thread, daemon=True).start()
+                
+                confirm_dialog.connect("response", on_confirm_response)
+                confirm_dialog.present()
+        
+        dialog.connect("response", on_response)
+        dialog.present()
+    
+    def _on_php_install_extension(self, service, popular_extensions, installed_extensions):
+        """Install PHP extension dialog"""
+        dialog = Adw.MessageDialog.new(self, _("Install PHP Extension"), None)
+        dialog.set_body(_("Enter the extension name or select from popular extensions"))
+        
+        # Create form
+        form_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        form_box.set_spacing(12)
+        form_box.set_margin_top(12)
+        
+        # Extension name entry
+        name_label = Gtk.Label(label=_("Extension Name:"))
+        name_label.set_halign(Gtk.Align.START)
+        name_entry = Gtk.Entry()
+        name_entry.set_placeholder_text("e.g., redis, imagick, xdebug")
+        
+        form_box.append(name_label)
+        form_box.append(name_entry)
+        
+        # Popular extensions (not already installed)
+        available_popular = [ext for ext in popular_extensions if ext not in installed_extensions]
+        if available_popular:
+            popular_label = Gtk.Label(label=_("Popular Extensions:"))
+            popular_label.set_halign(Gtk.Align.START)
+            popular_label.set_margin_top(12)
+            form_box.append(popular_label)
+            
+            # Create flow box for popular extensions
+            flow_box = Gtk.FlowBox()
+            flow_box.set_max_children_per_line(4)
+            flow_box.set_selection_mode(Gtk.SelectionMode.SINGLE)
+            
+            for ext in available_popular[:8]:  # Show max 8 popular extensions
+                button = Gtk.Button(label=ext)
+                button.add_css_class("pill")
+                button.connect("clicked", lambda btn, extension=ext: name_entry.set_text(extension))
+                flow_box.append(button)
+            
+            form_box.append(flow_box)
+        
+        dialog.set_extra_child(form_box)
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("install", _("Install"))
+        dialog.set_response_appearance("install", Adw.ResponseAppearance.SUGGESTED)
+        
+        def on_response(dialog, response):
+            if response == "install":
+                extension = name_entry.get_text().strip()
+                if not extension:
+                    self._show_toast(_("Extension name is required"))
+                    return
+                
+                if not service.validate_extension(extension):
+                    self._show_toast(_("Invalid extension name"))
+                    return
+                
+                dialog.close()
+                
+                # Show progress dialog
+                self._show_loading_dialog(f"Installing PHP extension {extension}...")
+                
+                def install_thread():
+                    try:
+                        success, message = service.install_extension(extension)
+                        GLib.idle_add(self._on_operation_complete, success, message)
+                    except Exception as e:
+                        GLib.idle_add(self._on_operation_complete, False, str(e))
+                
+                import threading
+                threading.Thread(target=install_thread, daemon=True).start()
+        
+        dialog.connect("response", on_response)
+        dialog.present()
+    
+    def _on_php_manage_extensions(self, service, installed_extensions):
+        """Manage PHP extensions dialog"""
+        dialog = Adw.MessageDialog.new(self, _("Manage PHP Extensions"), None)
+        dialog.set_body(_("Installed PHP extensions"))
+        
+        if not installed_extensions:
+            dialog.set_body(_("No extensions found"))
+            dialog.add_response("ok", _("OK"))
+            dialog.present()
+            return
+        
+        # Create extensions list
+        list_box = Gtk.ListBox()
+        list_box.set_selection_mode(Gtk.SelectionMode.NONE)
+        list_box.add_css_class("boxed-list")
+        
+        # Core extensions that shouldn't be uninstalled
+        core_extensions = {'Core', 'standard', 'SPL', 'Reflection', 'pcre', 'date', 'hash'}
+        
+        for extension in sorted(installed_extensions):
+            row = Gtk.ListBoxRow()
+            row.set_selectable(False)
+            row.set_activatable(False)
+            
+            box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+            box.set_spacing(12)
+            box.set_margin_top(8)
+            box.set_margin_bottom(8)
+            box.set_margin_start(12)
+            box.set_margin_end(12)
+            
+            label = Gtk.Label(label=extension)
+            label.set_hexpand(True)
+            label.set_halign(Gtk.Align.START)
+            box.append(label)
+            
+            if extension in core_extensions:
+                core_label = Gtk.Label(label=_("Core"))
+                core_label.add_css_class("dim-label")
+                box.append(core_label)
+            else:
+                uninstall_btn = Gtk.Button()
+                uninstall_btn.set_icon_name("edit-delete-symbolic")
+                uninstall_btn.add_css_class("destructive-action")
+                uninstall_btn.set_tooltip_text(_("Uninstall"))
+                uninstall_btn.connect("clicked", lambda btn, ext=extension: self._on_php_uninstall_extension(service, ext, dialog))
+                box.append(uninstall_btn)
+            
+            row.set_child(box)
+            list_box.append(row)
+        
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_child(list_box)
+        scrolled.set_min_content_height(400)
+        scrolled.set_margin_top(12)
+        
+        dialog.set_extra_child(scrolled)
+        dialog.add_response("close", _("Close"))
+        dialog.present()
+    
+    def _on_php_uninstall_extension(self, service, extension, parent_dialog):
+        """Uninstall PHP extension"""
+        dialog = Adw.MessageDialog.new(parent_dialog, _("Uninstall Extension"), None)
+        dialog.set_body(_("Are you sure you want to uninstall the {extension} extension?").format(extension=extension))
+        
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("uninstall", _("Uninstall"))
+        dialog.set_response_appearance("uninstall", Adw.ResponseAppearance.DESTRUCTIVE)
+        
+        def on_response(dialog, response):
+            if response == "uninstall":
+                dialog.close()
+                parent_dialog.close()
+                
+                # Show progress dialog
+                self._show_loading_dialog(f"Uninstalling PHP extension {extension}...")
+                
+                def uninstall_thread():
+                    try:
+                        success, message = service.uninstall_extension(extension)
+                        GLib.idle_add(self._on_operation_complete, success, message)
+                    except Exception as e:
+                        GLib.idle_add(self._on_operation_complete, False, str(e))
+                
+                import threading
+                threading.Thread(target=uninstall_thread, daemon=True).start()
+        
+        dialog.connect("response", on_response)
+        dialog.present()
+
+    def _show_mysql_databases(self, service, databases):
+        """Show MySQL databases list dialog"""
+        dialog = Adw.MessageDialog.new(self, _("MySQL Databases"), None)
+        
+        if not databases:
+            dialog.set_body(_("No user databases found. You can create your first database now."))
+            dialog.add_response("close", _("Close"))
+            dialog.add_response("create", _("Create Database"))
+            dialog.set_response_appearance("create", Adw.ResponseAppearance.SUGGESTED)
+            
+            def on_empty_response(dialog, response):
+                if response == "create":
+                    dialog.close()
+                    self._on_mysql_create_database(service)
+            
+            dialog.connect("response", on_empty_response)
+            dialog.present()
+            return
+        
+        # Create scrollable list
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scrolled.set_min_content_height(200)
+        scrolled.set_max_content_height(400)
+        
+        list_box = Gtk.ListBox()
+        list_box.add_css_class("boxed-list")
+        
+        for db_name in databases:
+            row = Adw.ActionRow()
+            row.set_title(db_name)
+            
+            # Add database icon
+            db_icon = Gtk.Image.new_from_icon_name("server-database-symbolic")
+            row.add_prefix(db_icon)
+            
+            # Add delete button
+            delete_btn = Gtk.Button()
+            delete_btn.set_icon_name("user-trash-symbolic")
+            delete_btn.add_css_class("flat")
+            delete_btn.add_css_class("destructive-action")
+            delete_btn.set_tooltip_text(_("Delete Database"))
+            delete_btn.connect("clicked", lambda b, db=db_name: self._confirm_delete_database(service, db, dialog))
+            row.add_suffix(delete_btn)
+            
+            list_box.append(row)
+        
+        scrolled.set_child(list_box)
+        
+        # Create main box
+        main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        main_box.set_spacing(12)
+        main_box.set_margin_top(12)
+        
+        # Add header
+        header_label = Gtk.Label(label=f"Found {len(databases)} user database(s):")
+        header_label.set_halign(Gtk.Align.START)
+        main_box.append(header_label)
+        
+        main_box.append(scrolled)
+        
+        dialog.set_extra_child(main_box)
+        dialog.add_response("close", _("Close"))
+        dialog.add_response("create", _("Create New"))
+        dialog.set_response_appearance("create", Adw.ResponseAppearance.SUGGESTED)
+        
+        def on_response(dialog, response):
+            if response == "create":
+                dialog.close()
+                self._on_mysql_create_database(service)
+        
+        dialog.connect("response", on_response)
+        dialog.present()
+    
+    def _show_mysql_users(self, service, users):
+        """Show MySQL users list dialog"""
+        dialog = Adw.MessageDialog.new(self, _("MySQL Users"), None)
+        
+        if not users:
+            dialog.set_body(_("No users found. You can create your first user now."))
+            dialog.add_response("close", _("Close"))
+            dialog.add_response("create", _("Create User"))
+            dialog.set_response_appearance("create", Adw.ResponseAppearance.SUGGESTED)
+            
+            def on_empty_user_response(dialog, response):
+                if response == "create":
+                    dialog.close()
+                    self._on_mysql_create_user(service)
+            
+            dialog.connect("response", on_empty_user_response)
+            dialog.present()
+            return
+        
+        # Create scrollable list
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scrolled.set_min_content_height(200)
+        scrolled.set_max_content_height(400)
+        
+        list_box = Gtk.ListBox()
+        list_box.add_css_class("boxed-list")
+        
+        for user in users:
+            row = Adw.ActionRow()
+            row.set_title(user.get('username', ''))
+            row.set_subtitle(f"Host: {user.get('host', 'localhost')}")
+            
+            # Add user icon
+            user_icon = Gtk.Image.new_from_icon_name("system-users-symbolic")
+            row.add_prefix(user_icon)
+            
+            # Show if it's a system user
+            if user.get('username') in ['root', 'mysql.session', 'mysql.sys', 'debian-sys-maint']:
+                system_label = Gtk.Label(label="System")
+                system_label.add_css_class("caption")
+                system_label.add_css_class("dim-label")
+                row.add_suffix(system_label)
+            
+            list_box.append(row)
+        
+        scrolled.set_child(list_box)
+        
+        # Create main box
+        main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        main_box.set_spacing(12)
+        main_box.set_margin_top(12)
+        
+        # Add header
+        header_label = Gtk.Label(label=f"Found {len(users)} user(s):")
+        header_label.set_halign(Gtk.Align.START)
+        main_box.append(header_label)
+        
+        main_box.append(scrolled)
+        
+        dialog.set_extra_child(main_box)
+        dialog.add_response("close", _("Close"))
+        dialog.add_response("create", _("Create New"))
+        dialog.set_response_appearance("create", Adw.ResponseAppearance.SUGGESTED)
+        
+        def on_response(dialog, response):
+            if response == "create":
+                dialog.close()
+                self._on_mysql_create_user(service)
+        
+        dialog.connect("response", on_response)
+        dialog.present()
+
+    def _confirm_delete_database(self, service, db_name, parent_dialog):
+        """Confirm database deletion"""
+        confirm_dialog = Adw.MessageDialog.new(self, _("Delete Database"), None)
+        confirm_dialog.set_body(f"Are you sure you want to delete database '{db_name}'?\n\nThis action cannot be undone!")
+        
+        confirm_dialog.add_response("cancel", _("Cancel"))
+        confirm_dialog.add_response("delete", _("Delete"))
+        confirm_dialog.set_response_appearance("delete", Adw.ResponseAppearance.DESTRUCTIVE)
+        
+        def on_confirm(dialog, response):
+            if response == "delete":
+                # Close dialogs
+                dialog.close()
+                parent_dialog.close()
+                
+                # Check if we need sudo password
+                mysql_info = service.get_mysql_status_info()
+                if mysql_info.get('auth_method') == 'Unix Socket (sudo mysql)':
+                    # Need sudo password
+                    def on_password_provided(sudo_password):
+                        self._show_toast(f"Deleting database '{db_name}'...")
+                        
+                        def delete_thread():
+                            try:
+                                success, message = service.drop_database(db_name, sudo_password=sudo_password)
+                                
+                                def update_ui():
+                                    self._show_toast(message)
+                                    if success and self.current_service and self.current_service.name == "mysql":
+                                        self._refresh_detail_page()
+                                
+                                GLib.idle_add(update_ui)
+                                    
+                            except Exception as e:
+                                def handle_error():
+                                    self._show_toast(f"Error deleting database: {str(e)}")
+                                
+                                GLib.idle_add(handle_error)
+                        
+                        import threading
+                        threading.Thread(target=delete_thread, daemon=True).start()
+                    
+                    self._show_sudo_password_dialog(on_password_provided)
+                else:
+                    # Use existing password
+                    self._show_toast(f"Deleting database '{db_name}'...")
+                    
+                    def delete_thread():
+                        try:
+                            success, message = service.drop_database(db_name)
+                            
+                            def update_ui():
+                                self._show_toast(message)
+                                if success and self.current_service and self.current_service.name == "mysql":
+                                    self._refresh_detail_page()
+                            
+                            GLib.idle_add(update_ui)
+                                
+                        except Exception as e:
+                            def handle_error():
+                                self._show_toast(f"Error deleting database: {str(e)}")
+                            
+                            GLib.idle_add(handle_error)
+                    
+                    import threading
+                    threading.Thread(target=delete_thread, daemon=True).start()
+        
+        confirm_dialog.connect("response", on_confirm)
+        confirm_dialog.present()
