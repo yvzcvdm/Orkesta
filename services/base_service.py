@@ -130,14 +130,13 @@ class BaseService(ABC):
     # HELPER METHODS - Script Execution
     # ============================================
     
-    def _execute_script(self, script_path: str, *args, use_pkexec: bool = True, timeout: int = 300) -> Tuple[bool, str]:
+    def _execute_script(self, script_path: str, *args, timeout: int = 300) -> Tuple[bool, str]:
         """
         Script çalıştır (CLI-First yaklaşımı)
         
         Args:
             script_path: Script yolu (örn: scripts/apache/install.sh)
             args: Script parametreleri
-            use_pkexec: PolicyKit kullan (GUI için)
             timeout: Timeout (saniye)
         
         Returns:
