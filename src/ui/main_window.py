@@ -652,6 +652,37 @@ class MainWindow(Adw.ApplicationWindow):
         logger.info(f"Toast: {message}")
         print(f"📢 {message}")
     
+    def _show_sudo_password_dialog(self, callback):
+        """Show sudo password dialog"""
+        dialog = Adw.MessageDialog.new(self, _("Authentication Required"), None)
+        dialog.set_body(_("Please enter your password to continue"))
+        
+        # Password entry
+        password_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        password_box.set_spacing(8)
+        password_box.set_margin_top(12)
+        
+        password_entry = Gtk.PasswordEntry()
+        password_entry.set_property("placeholder-text", _("Password"))
+        password_entry.set_show_peek_icon(True)
+        password_box.append(password_entry)
+        
+        dialog.set_extra_child(password_box)
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("ok", _("OK"))
+        dialog.set_response_appearance("ok", Adw.ResponseAppearance.SUGGESTED)
+        
+        def on_response(dialog, response):
+            if response == "ok":
+                password = password_entry.get_text()
+                if password:
+                    callback(password)
+                else:
+                    self._show_toast(_("Password cannot be empty"))
+        
+        dialog.connect("response", on_response)
+        dialog.present()
+    
     # ==================== NAVIGATION ====================
     
     def _on_service_row_activated(self, listbox, row):
@@ -975,6 +1006,22 @@ class MainWindow(Adw.ApplicationWindow):
             mysql_info_group.add(error_row)
         
         main_box.append(mysql_info_group)
+        
+        # MySQL Management Actions
+        mysql_management_group = Adw.PreferencesGroup()
+        mysql_management_group.set_title(_("MySQL Management"))
+        
+        # Change Root Password
+        password_row = Adw.ActionRow()
+        password_row.set_title(_("Change Root Password"))
+        password_row.set_subtitle(_("Set or change MySQL root password"))
+        password_row.set_activatable(True)
+        password_row.connect("activated", lambda r: self._on_mysql_change_password(service))
+        password_icon = Gtk.Image.new_from_icon_name("dialog-password-symbolic")
+        password_row.add_prefix(password_icon)
+        mysql_management_group.add(password_row)
+        
+        main_box.append(mysql_management_group)
     
 
     
@@ -1057,13 +1104,18 @@ class MainWindow(Adw.ApplicationWindow):
                     return
                 
                 # Reset password (no current password needed)
-                self._run_service_action_with_progress(
-                    service,
-                    lambda: service.reset_root_password(new_password),
-                    _("Setting MySQL root password..."),
-                    _("MySQL root password set successfully!"),
-                    _("Failed to set MySQL root password")
-                )
+                try:
+                    success, message = service.reset_root_password(new_password)
+                    if success:
+                        self._show_toast(_("MySQL root password set successfully!"))
+                        # Refresh detail page to show new auth method
+                        if self.current_service and self.current_service.name == service.name:
+                            GLib.timeout_add_seconds(1, self._refresh_detail_page)
+                    else:
+                        self._show_toast(_("Failed to set MySQL root password: {error}").format(error=message))
+                except Exception as e:
+                    logger.error(f"Error setting MySQL root password: {e}")
+                    self._show_toast(_("Error: {error}").format(error=str(e)))
                 
                 dialog.close()
         
@@ -1478,24 +1530,6 @@ class MainWindow(Adw.ApplicationWindow):
             # Show some key modules status
             modules = service.list_modules()
             
-            # Filter important modules to show
-            important_modules = ['ssl', 'rewrite', 'headers', 'deflate', 'expires']
-            php_modules = [m for m in modules if m['name'].startswith('php')]
-            
-            # Show PHP module if exists
-            if php_modules:
-                for php_mod in php_modules[:1]:  # Show only first PHP module
-                    php_row = Adw.ActionRow()
-                    php_row.set_title(f"PHP Module ({php_mod['name']})")
-                    if php_mod['enabled']:
-                        status_label = Gtk.Label(label="✅ " + _("Enabled"))
-                        status_label.add_css_class("success")
-                    else:
-                        status_label = Gtk.Label(label="❌ " + _("Disabled"))
-                        status_label.add_css_class("error")
-                    php_row.add_suffix(status_label)
-                    modules_group.add(php_row)
-            
             # Show SSL module
             ssl_modules = [m for m in modules if m['name'] == 'ssl']
             if ssl_modules:
@@ -1547,53 +1581,95 @@ class MainWindow(Adw.ApplicationWindow):
         
         main_box.append(modules_group)
         
-        # PHP Version Management
-        php_group = Adw.PreferencesGroup()
-        php_group.set_title(_("PHP Configuration"))
+        # PHP Modules Management (Apache-specific)
+        php_modules_group = Adw.PreferencesGroup()
+        php_modules_group.set_title(_("PHP Modules"))
+        php_modules_group.set_description(_("Manage PHP Apache modules (install/switch/remove)"))
         
         try:
-            php_versions = service.get_installed_php_versions()
-            active_version = service.get_active_php_version()
+            php_module_installed = service.is_php_module_installed()
             
-            # Active PHP version row
-            php_version_row = Adw.ActionRow()
-            php_version_row.set_title(_("Active PHP Version"))
-            if active_version:
-                php_version_label = Gtk.Label(label=f"PHP {active_version}")
-                php_version_label.add_css_class("monospace")
-                php_version_row.add_suffix(php_version_label)
+            if php_module_installed:
+                # Get PHP module list
+                php_modules = service.get_installed_php_modules()
+                active_php_module = service.get_active_php_module()
+                
+                # Active PHP Apache module
+                active_module_row = Adw.ActionRow()
+                active_module_row.set_title(_("Active PHP Apache Module"))
+                if active_php_module:
+                    module_label = Gtk.Label(label=f"PHP {active_php_module}")
+                    module_label.add_css_class("monospace")
+                    module_label.add_css_class("success")
+                    active_module_row.add_suffix(module_label)
+                else:
+                    module_label = Gtk.Label(label=_("None"))
+                    module_label.add_css_class("dim-label")
+                    active_module_row.add_suffix(module_label)
+                php_modules_group.add(active_module_row)
+                
+                # List installed PHP modules
+                if php_modules and len(php_modules) > 0:
+                    modules_row = Adw.ActionRow()
+                    modules_row.set_title(_("Installed PHP Modules"))
+                    modules_info = []
+                    for mod in php_modules:
+                        status = "✅" if mod['enabled'] else "⚪"
+                        modules_info.append(f"{status} PHP {mod['version']}")
+                    modules_row.set_subtitle(" • ".join(modules_info))
+                    php_modules_group.add(modules_row)
+                
+                # Switch PHP module (if multiple available)
+                if php_modules and len(php_modules) > 1:
+                    switch_module_row = Adw.ActionRow()
+                    switch_module_row.set_title(_("Switch PHP Module"))
+                    switch_module_row.set_subtitle(_("Change active PHP Apache module"))
+                    switch_module_row.set_activatable(True)
+                    switch_module_row.connect("activated", lambda r: self._on_apache_switch_php_module(service, php_modules))
+                    switch_module_icon = Gtk.Image.new_from_icon_name("emblem-synchronizing-symbolic")
+                    switch_module_row.add_prefix(switch_module_icon)
+                    php_modules_group.add(switch_module_row)
+                
+                # Install PHP module
+                install_php_module_row = Adw.ActionRow()
+                install_php_module_row.set_title(_("Install PHP Module"))
+                install_php_module_row.set_subtitle(_("Install PHP Apache module for a specific version"))
+                install_php_module_row.set_activatable(True)
+                install_php_module_row.connect("activated", lambda r: self._on_apache_install_php_module_dialog(service))
+                install_php_module_icon = Gtk.Image.new_from_icon_name("list-add-symbolic")
+                install_php_module_row.add_prefix(install_php_module_icon)
+                php_modules_group.add(install_php_module_row)
+                
+                # Uninstall PHP module
+                if php_modules and len(php_modules) > 0:
+                    uninstall_php_module_row = Adw.ActionRow()
+                    uninstall_php_module_row.set_title(_("Uninstall PHP Module"))
+                    uninstall_php_module_row.set_subtitle(_("Remove a PHP Apache module"))
+                    uninstall_php_module_row.set_activatable(True)
+                    uninstall_php_module_row.connect("activated", lambda r: self._on_apache_uninstall_php_module_dialog(service, php_modules))
+                    uninstall_php_module_icon = Gtk.Image.new_from_icon_name("edit-delete-symbolic")
+                    uninstall_php_module_row.add_prefix(uninstall_php_module_icon)
+                    php_modules_group.add(uninstall_php_module_row)
             else:
-                php_version_label = Gtk.Label(label=_("Not detected"))
-                php_version_label.add_css_class("dim-label")
-                php_version_row.add_suffix(php_version_label)
-            php_group.add(php_version_row)
-            
-            # Switch PHP version (if multiple versions available)
-            if len(php_versions) > 1:
-                switch_php_row = Adw.ActionRow()
-                switch_php_row.set_title(_("Switch PHP Version"))
-                switch_php_row.set_subtitle(_("Change the active PHP version for Apache"))
-                switch_php_row.set_activatable(True)
-                switch_php_row.connect("activated", lambda r: self._on_apache_switch_php(service, php_versions))
-                switch_php_icon = Gtk.Image.new_from_icon_name("emblem-synchronizing-symbolic")
-                switch_php_row.add_prefix(switch_php_icon)
-                php_group.add(switch_php_row)
-            elif php_versions:
-                info_label = Gtk.Label()
-                info_label.set_markup(f"<span size='small'>{_('Installed: ')} {', '.join(php_versions)}</span>")
-                info_label.set_halign(Gtk.Align.START)
-                info_label.set_margin_top(6)
-                info_label.add_css_class("dim-label")
-                # Add as a separate row
-                info_row = Adw.ActionRow()
-                info_row.set_title(_("Installed Versions"))
-                info_row.set_subtitle(', '.join(f"PHP {v}" for v in php_versions))
-                php_group.add(info_row)
+                # Install PHP module button
+                install_php_module_row = Adw.ActionRow()
+                install_php_module_row.set_title(_("Install PHP Module"))
+                install_php_module_row.set_subtitle(_("Install PHP Apache module"))
+                install_php_module_row.set_activatable(True)
+                install_php_module_row.connect("activated", lambda r: self._on_apache_install_php_module_dialog(service))
+                install_php_module_icon = Gtk.Image.new_from_icon_name("list-add-symbolic")
+                install_php_module_row.add_prefix(install_php_module_icon)
+                php_modules_group.add(install_php_module_row)
         
         except Exception as e:
-            logger.error(f"Error getting PHP info: {e}")
+            logger.error(f"Error loading PHP modules: {e}")
+            error_row = Adw.ActionRow()
+            error_row.set_title(_("Error"))
+            error_row.set_subtitle(str(e))
+            error_row.set_sensitive(False)
+            php_modules_group.add(error_row)
         
-        main_box.append(php_group)
+        main_box.append(php_modules_group)
         
         # SSL Certificate Management
         ssl_cert_group = Adw.PreferencesGroup()
@@ -1692,20 +1768,20 @@ class MainWindow(Adw.ApplicationWindow):
     
     # ==================== APACHE HANDLERS ====================
     
-    def _on_apache_switch_php(self, service, versions):
-        """Switch PHP version dialog"""
-        dialog = Adw.MessageDialog.new(self, _("Switch PHP Version"), None)
-        dialog.set_body(_("Select the PHP version to use with Apache"))
+    def _on_apache_switch_php_module(self, service, php_modules):
+        """Switch PHP Apache module dialog"""
+        dialog = Adw.MessageDialog.new(self, _("Switch PHP Module"), None)
+        dialog.set_body(_("Select the PHP Apache module to activate"))
         
-        # Create version selector
+        # Create module selector
         list_box = Gtk.ListBox()
         list_box.set_selection_mode(Gtk.SelectionMode.SINGLE)
         list_box.add_css_class("boxed-list")
         
-        active_version = service.get_active_php_version()
-        selected_version = [active_version]  # Use list to allow modification in closure
+        active_module = service.get_active_php_module()
+        selected_version = [active_module]  # Use list to allow modification in closure
         
-        for version in versions:
+        for mod in php_modules:
             row = Gtk.ListBoxRow()
             box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
             box.set_spacing(12)
@@ -1714,17 +1790,18 @@ class MainWindow(Adw.ApplicationWindow):
             box.set_margin_start(12)
             box.set_margin_end(12)
             
-            label = Gtk.Label(label=f"PHP {version}")
+            label = Gtk.Label(label=f"PHP {mod['version']}")
             label.set_hexpand(True)
             label.set_halign(Gtk.Align.START)
             box.append(label)
             
-            if version == active_version:
+            if mod['enabled']:
                 check = Gtk.Image.new_from_icon_name("emblem-ok-symbolic")
+                check.add_css_class("success")
                 box.append(check)
             
             row.set_child(box)
-            row.version = version
+            row.version = mod['version']
             list_box.append(row)
         
         def on_row_activated(listbox, row):
@@ -1744,12 +1821,141 @@ class MainWindow(Adw.ApplicationWindow):
         
         def on_response(dialog, response):
             if response == "switch" and selected_version[0]:
-                success, message = service.switch_php_version(selected_version[0])
-                self._show_toast(message)
-                if success:
-                    dialog.close()
-                    if self.current_service and self.current_service.name == service.name:
-                        self._refresh_detail_page()
+                dialog.close()
+                self._show_loading_dialog(_("Switching PHP module..."))
+                
+                # Run in thread
+                import threading
+                def switch_task():
+                    try:
+                        success, message = service.switch_php_module(selected_version[0])
+                        GLib.idle_add(self._on_operation_complete, success, message)
+                    except Exception as e:
+                        logger.error(f"Error switching PHP module: {e}")
+                        GLib.idle_add(self._on_operation_complete, False, str(e))
+                
+                thread = threading.Thread(target=switch_task, daemon=True)
+                thread.start()
+        
+        dialog.connect("response", on_response)
+        dialog.present()
+    
+    def _on_apache_install_php_module_dialog(self, service):
+        """Install PHP Apache module dialog"""
+        dialog = Adw.MessageDialog.new(self, _("Install PHP Module"), None)
+        dialog.set_body(_("Enter the PHP version to install Apache module for (e.g., 8.2, 7.4)"))
+        
+        # Version entry
+        entry_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        entry_box.set_spacing(8)
+        entry_box.set_margin_top(12)
+        
+        entry = Gtk.Entry()
+        entry.set_property("placeholder-text", "e.g., 8.2")
+        entry_box.append(entry)
+        
+        # Info label
+        info_label = Gtk.Label()
+        info_label.set_markup(f"<span size='small'>{_('Leave empty to auto-detect')}</span>")
+        info_label.add_css_class("dim-label")
+        info_label.set_halign(Gtk.Align.START)
+        entry_box.append(info_label)
+        
+        dialog.set_extra_child(entry_box)
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("install", _("Install"))
+        dialog.set_response_appearance("install", Adw.ResponseAppearance.SUGGESTED)
+        
+        def on_response(dialog, response):
+            if response == "install":
+                version = entry.get_text().strip() or None
+                dialog.close()
+                
+                self._show_loading_dialog(_("Installing PHP module..."))
+                
+                # Run in thread
+                import threading
+                def install_task():
+                    try:
+                        success, message = service.install_php_module(version)
+                        GLib.idle_add(self._on_operation_complete, success, message)
+                    except Exception as e:
+                        logger.error(f"Error installing PHP module: {e}")
+                        GLib.idle_add(self._on_operation_complete, False, str(e))
+                
+                thread = threading.Thread(target=install_task, daemon=True)
+                thread.start()
+        
+        dialog.connect("response", on_response)
+        dialog.present()
+    
+    def _on_apache_uninstall_php_module_dialog(self, service, php_modules):
+        """Uninstall PHP Apache module dialog"""
+        dialog = Adw.MessageDialog.new(self, _("Uninstall PHP Module"), None)
+        dialog.set_body(_("Select the PHP Apache module to uninstall"))
+        
+        # Create module selector
+        list_box = Gtk.ListBox()
+        list_box.set_selection_mode(Gtk.SelectionMode.SINGLE)
+        list_box.add_css_class("boxed-list")
+        
+        selected_version = [None]  # Use list to allow modification in closure
+        
+        for mod in php_modules:
+            row = Gtk.ListBoxRow()
+            box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+            box.set_spacing(12)
+            box.set_margin_top(8)
+            box.set_margin_bottom(8)
+            box.set_margin_start(12)
+            box.set_margin_end(12)
+            
+            label = Gtk.Label(label=f"PHP {mod['version']}")
+            label.set_hexpand(True)
+            label.set_halign(Gtk.Align.START)
+            box.append(label)
+            
+            if mod['enabled']:
+                status = Gtk.Label(label="(Active)")
+                status.add_css_class("dim-label")
+                box.append(status)
+            
+            row.set_child(box)
+            row.version = mod['version']
+            list_box.append(row)
+        
+        def on_row_activated(listbox, row):
+            selected_version[0] = row.version
+        
+        list_box.connect("row-activated", on_row_activated)
+        
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_child(list_box)
+        scrolled.set_min_content_height(200)
+        scrolled.set_margin_top(12)
+        
+        dialog.set_extra_child(scrolled)
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("uninstall", _("Uninstall"))
+        dialog.set_response_appearance("uninstall", Adw.ResponseAppearance.DESTRUCTIVE)
+        
+        def on_response(dialog, response):
+            if response == "uninstall" and selected_version[0]:
+                dialog.close()
+                self._show_loading_dialog(_("Uninstalling PHP module..."))
+                
+                # Run in thread
+                import threading
+                def uninstall_task():
+                    try:
+                        success, message = service.uninstall_php_module(selected_version[0])
+                        GLib.idle_add(self._on_operation_complete, success, message)
+                    except Exception as e:
+                        logger.error(f"Error uninstalling PHP module: {e}")
+                        GLib.idle_add(self._on_operation_complete, False, str(e))
+                
+                thread = threading.Thread(target=uninstall_task, daemon=True)
+                thread.start()
         
         dialog.connect("response", on_response)
         dialog.present()

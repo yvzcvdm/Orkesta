@@ -179,6 +179,22 @@ class ApacheService(BaseService):
         success, output = self._execute_script(self.SCRIPT_NAME, 'php-module-installed', timeout=10)
         return success and output.strip().lower() == 'true'
     
+    def get_installed_php_modules(self) -> List[Dict[str, Any]]:
+        """Get list of installed PHP Apache modules with their status"""
+        success, output = self._execute_script(self.SCRIPT_NAME, 'php-module-list', '--json', timeout=30)
+        if not success:
+            return []
+        try:
+            import json
+            return json.loads(output)
+        except:
+            return []
+    
+    def get_active_php_module(self) -> Optional[str]:
+        """Get currently active PHP Apache module version"""
+        success, output = self._execute_script(self.SCRIPT_NAME, 'php-module-get-active', timeout=10)
+        return output.strip() if success and output.strip() else None
+    
     def install_php_module(self, version: Optional[str] = None) -> Tuple[bool, str]:
         """Install PHP module for Apache"""
         args = ['php-module-install']
@@ -192,6 +208,10 @@ class ApacheService(BaseService):
         if version:
             args.append(version)
         return self._execute_script(self.SCRIPT_NAME, *args, timeout=120)
+    
+    def switch_php_module(self, version: str) -> Tuple[bool, str]:
+        """Switch active PHP Apache module to specified version"""
+        return self._execute_script(self.SCRIPT_NAME, 'php-module-switch', version, timeout=60)
     
     # ==================== SSL MANAGEMENT ====================
     

@@ -295,7 +295,32 @@ action_install() {
     systemctl enable "$service_name" 2>&1
     systemctl start "$service_name" 2>&1
     
-    echo "Apache installed and started successfully"
+    echo "Apache installed successfully"
+    
+    # Auto-detect and install PHP module if PHP is available
+    if [ "$OS_TYPE" = "debian" ]; then
+        echo "Checking for installed PHP versions..."
+        local php_found=false
+        
+        # Check for common PHP versions
+        for version in 8.4 8.3 8.2 8.1 8.0 7.4 7.3 7.2; do
+            if command -v "php$version" >/dev/null 2>&1 || [ -d "/etc/php/$version" ]; then
+                echo "Found PHP $version - Installing Apache module..."
+                if apt-get install -y "libapache2-mod-php$version" 2>&1; then
+                    echo "PHP $version Apache module installed successfully"
+                    systemctl restart "$service_name" 2>&1
+                    php_found=true
+                    break
+                fi
+            fi
+        done
+        
+        if [ "$php_found" = false ]; then
+            echo "No PHP installation detected. You can install PHP modules later."
+        fi
+    fi
+    
+    echo "Apache installation completed"
     exit 0
 }
 
@@ -956,6 +981,112 @@ action_php_module_installed() {
     exit 0
 }
 
+action_php_module_list() {
+    local json_output=false
+    
+    if [ "$1" = "--json" ]; then
+        json_output=true
+    fi
+    
+    if [ "$OS_TYPE" = "debian" ]; then
+        local modules=()
+        
+        # Find all installed PHP Apache modules
+        for version in $(dpkg -l | grep "^ii.*libapache2-mod-php" | awk '{print $2}' | grep -oP 'php\K[0-9]+\.[0-9]+'); do
+            local enabled=false
+            
+            # Check if module is enabled
+            if [ -f "/etc/apache2/mods-enabled/php${version}.load" ]; then
+                enabled=true
+            fi
+            
+            modules+=("$version:$enabled")
+        done
+        
+        if [ "$json_output" = true ]; then
+            echo -n "["
+            local first=true
+            for mod_info in "${modules[@]}"; do
+                IFS=':' read -r version enabled <<< "$mod_info"
+                if [ "$first" = true ]; then
+                    first=false
+                else
+                    echo -n ","
+                fi
+                echo -n "{\"version\":\"$version\",\"enabled\":$enabled}"
+            done
+            echo "]"
+        else
+            for mod_info in "${modules[@]}"; do
+                IFS=':' read -r version enabled <<< "$mod_info"
+                if [ "$enabled" = true ]; then
+                    echo "PHP $version [ENABLED]"
+                else
+                    echo "PHP $version [DISABLED]"
+                fi
+            done
+        fi
+    else
+        if [ "$json_output" = true ]; then
+            echo "[]"
+        else
+            echo "PHP module listing not supported on this OS"
+        fi
+    fi
+    exit 0
+}
+
+action_php_module_get_active() {
+    if [ "$OS_TYPE" = "debian" ]; then
+        # Check which PHP module is currently enabled
+        for version in 8.4 8.3 8.2 8.1 8.0 7.4 7.3 7.2; do
+            if [ -f "/etc/apache2/mods-enabled/php${version}.load" ]; then
+                echo "$version"
+                exit 0
+            fi
+        done
+        echo ""
+    else
+        echo ""
+    fi
+    exit 0
+}
+
+action_php_module_switch() {
+    local target_version="$1"
+    
+    if [ -z "$target_version" ]; then
+        echo "ERROR: PHP version is required"
+        exit 1
+    fi
+    
+    if [ "$OS_TYPE" = "debian" ]; then
+        # Check if target version is installed
+        if ! dpkg -l | grep -q "^ii.*libapache2-mod-php${target_version}"; then
+            echo "ERROR: PHP $target_version Apache module is not installed"
+            exit 1
+        fi
+        
+        # Disable all PHP modules
+        for version in $(dpkg -l | grep "^ii.*libapache2-mod-php" | awk '{print $2}' | grep -oP 'php\K[0-9]+\.[0-9]+'); do
+            a2dismod "php${version}" 2>/dev/null || true
+        done
+        
+        # Enable target version
+        a2enmod "php${target_version}" 2>&1
+        
+        # Restart Apache
+        local service_name=$(get_service_name)
+        systemctl restart "$service_name" 2>&1
+        
+        echo "Switched to PHP $target_version Apache module"
+    else
+        echo "ERROR: PHP module switching not supported on this OS"
+        exit 1
+    fi
+    exit 0
+}
+
 action_php_module_install() {
     local version="$1"
     
@@ -1316,12 +1447,15 @@ main() {
         module-disable)     action_module_disable "$@" ;;
         
         # PHP management
-        php-list-versions)    action_php_list_versions "$@" ;;
-        php-get-active)       action_php_get_active ;;
-        php-switch)           action_php_switch "$@" ;;
-        php-module-installed) action_php_module_installed ;;
-        php-module-install)   action_php_module_install "$@" ;;
-        php-module-uninstall) action_php_module_uninstall "$@" ;;
+        php-list-versions)       action_php_list_versions "$@" ;;
+        php-get-active)          action_php_get_active ;;
+        php-switch)              action_php_switch "$@" ;;
+        php-module-installed)    action_php_module_installed ;;
+        php-module-list)         action_php_module_list "$@" ;;
+        php-module-get-active)   action_php_module_get_active ;;
+        php-module-switch)       action_php_module_switch "$@" ;;
+        php-module-install)      action_php_module_install "$@" ;;
+        php-module-uninstall)    action_php_module_uninstall "$@" ;;
         
         # SSL management
         ssl-is-enabled)     action_ssl_is_enabled ;;
@@ -1362,10 +1496,15 @@ VIRTUAL HOST MANAGEMENT:
   vhost-update-php <filename> <version>         Update PHP version for vhost
 
 PHP MANAGEMENT:
-  php-list-versions [--json]    List installed PHP versions
-  php-get-active                Get active PHP version
-  php-switch <version>          Switch PHP version
-  php-module-installed          Check if PHP module is installed
+  php-list-versions [--json]    List installed PHP versions (system-wide)
+  php-get-active                Get active PHP CLI version
+  php-switch <version>          Switch PHP CLI version
+  
+PHP APACHE MODULE MANAGEMENT:
+  php-module-installed          Check if any PHP Apache module is installed
+  php-module-list [--json]      List installed PHP Apache modules
+  php-module-get-active         Get currently active PHP Apache module
+  php-module-switch <version>   Switch active PHP Apache module
   php-module-install [version]  Install PHP Apache module
   php-module-uninstall [ver]    Uninstall PHP Apache module
 
