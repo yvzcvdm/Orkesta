@@ -533,6 +533,22 @@ action_vhost_create() {
         exit 1
     fi
     
+    # Enable required Apache modules
+    if [ "$OS_TYPE" = "debian" ]; then
+        # Enable rewrite module for .htaccess URL rewriting
+        a2enmod rewrite >/dev/null 2>&1 || true
+        
+        # Enable headers module for security headers
+        a2enmod headers >/dev/null 2>&1 || true
+        
+        # If PHP version specified, enable proxy modules
+        if [ -n "$php_version" ]; then
+            a2enmod proxy >/dev/null 2>&1 || true
+            a2enmod proxy_fcgi >/dev/null 2>&1 || true
+            a2enmod setenvif >/dev/null 2>&1 || true
+        fi
+    fi
+    
     # Create document root
     mkdir -p "$document_root"
     

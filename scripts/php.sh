@@ -358,6 +358,31 @@ action_version_install() {
             ;;
     esac
     
+    # Enable required Apache modules for PHP-FPM
+    if [ "$OS_TYPE" = "debian" ]; then
+        # Disable mod_php if exists (conflicts with PHP-FPM)
+        a2dismod php${version} mpm_prefork >/dev/null 2>&1 || true
+        
+        # Enable mpm_event for better performance with PHP-FPM
+        a2enmod mpm_event >/dev/null 2>&1 || true
+        
+        # Enable proxy modules for PHP-FPM
+        a2enmod proxy >/dev/null 2>&1 || true
+        a2enmod proxy_fcgi >/dev/null 2>&1 || true
+        a2enmod setenvif >/dev/null 2>&1 || true
+        
+        # Enable rewrite module for .htaccess
+        a2enmod rewrite >/dev/null 2>&1 || true
+        
+        # Enable headers module for security headers
+        a2enmod headers >/dev/null 2>&1 || true
+        
+        # Restart Apache to apply changes
+        if systemctl is-active --quiet apache2; then
+            systemctl restart apache2 >/dev/null 2>&1 || true
+        fi
+    fi
+    
     echo "PHP $version installed successfully"
 }
 
