@@ -552,9 +552,33 @@ action_vhost_create() {
 EOF
     fi
     
-    # Set permissions
-    chown -R apache:apache "$document_root" 2>/dev/null || chown -R www-data:www-data "$document_root" 2>/dev/null || true
-    chmod -R 755 "$document_root"
+    # Set permissions for Apache access
+    # Get current user
+    local current_user=$(whoami)
+    if [ "$current_user" = "root" ]; then
+        current_user=$SUDO_USER
+    fi
+    
+    # Set proper ownership and permissions
+    # Keep user ownership but add www-data to group
+    chown -R $current_user:www-data "$document_root" 2>/dev/null || {
+        # If www-data group doesn't exist, try apache
+        chown -R $current_user:apache "$document_root" 2>/dev/null || {
+            # Fallback: just set current user
+            chown -R $current_user:$current_user "$document_root"
+        }
+    }
+    
+    # Set directory permissions: rwxr-xr-x (755)
+    find "$document_root" -type d -exec chmod 755 {} \;
+    # Set file permissions: rw-r--r-- (644)
+    find "$document_root" -type f -exec chmod 644 {} \;
+    # Make sure Apache can traverse parent directories
+    local parent_dir=$(dirname "$document_root")
+    while [ "$parent_dir" != "/" ] && [ "$parent_dir" != "." ]; do
+        chmod o+x "$parent_dir" 2>/dev/null || true
+        parent_dir=$(dirname "$parent_dir")
+    done
     
     # Create vhost config
     local vhost_dir=$(get_vhost_dir)
