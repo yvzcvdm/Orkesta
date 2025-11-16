@@ -155,10 +155,10 @@ class BaseService(ABC):
         readonly_commands = [
             'is-installed', 'is-running', 'version-get-active', 
             'version-list-installed', 'version-list-available',
-            'vhost-list', 'vhost-details', 'extension-list',
-            'database-list', 'user-list', 'status-info',
-            'php-list-versions', 'php-get-active', 'ssl-is-enabled',
-            'get-version', 'config-get', 'log-tail', 'log-view'
+            'extension-list',
+            'database-list', 'user-list',
+            'php-get-active', 'ssl-is-enabled',
+            'get-version', 'log-tail', 'log-view'
         ]
         
         # İlk argüman read-only komut mu?

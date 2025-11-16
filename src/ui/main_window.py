@@ -2519,6 +2519,14 @@ class MainWindow(Adw.ApplicationWindow):
         logger.info(f"Vhost details for {filename}: {details}")
         logger.info(f"Keys: {list(details.keys()) if isinstance(details, dict) else 'Not a dict'}")
         
+        # Log each field separately for debugging
+        logger.info(f"  filename: {details.get('filename', 'MISSING')}")
+        logger.info(f"  server_name: {details.get('server_name', 'MISSING')}")
+        logger.info(f"  document_root: {details.get('document_root', 'MISSING')}")
+        logger.info(f"  ssl: {details.get('ssl', 'MISSING')}")
+        logger.info(f"  php_version: {details.get('php_version', 'MISSING')}")
+        logger.info(f"  enabled: {details.get('enabled', 'MISSING')}")
+        
         # Create detail dialog
         dialog = Adw.Dialog()
         dialog.set_title(details.get('server_name', filename))
@@ -2607,6 +2615,17 @@ class MainWindow(Adw.ApplicationWindow):
         # Actions
         actions_group = Adw.PreferencesGroup()
         actions_group.set_title(_("Actions"))
+        
+        # Trust SSL Certificate (only if SSL is enabled)
+        if details.get('ssl', False):
+            trust_ssl_row = Adw.ActionRow()
+            trust_ssl_row.set_title(_("Trust SSL Certificate"))
+            trust_ssl_row.set_subtitle(_("Add certificate to system trust store (fixes browser warnings)"))
+            trust_ssl_row.set_activatable(True)
+            trust_ssl_row.connect("activated", lambda r: self._on_vhost_trust_ssl(service, details, dialog))
+            trust_ssl_icon = Gtk.Image.new_from_icon_name("security-high-symbolic")
+            trust_ssl_row.add_prefix(trust_ssl_icon)
+            actions_group.add(trust_ssl_row)
         
         # Edit virtual host
         edit_row = Adw.ActionRow()
@@ -2772,6 +2791,14 @@ class MainWindow(Adw.ApplicationWindow):
     
     def _on_vhost_edit(self, service, details, parent_dialog):
         """Edit virtual host configuration"""
+        # Always fetch fresh details from script to ensure we have latest data
+        filename = details.get('filename', '')
+        if filename:
+            fresh_details = service.get_vhost_details(filename)
+            if fresh_details:
+                details = fresh_details
+                logger.info(f"Refreshed vhost details: {details}")
+        
         # Create edit dialog
         dialog = Adw.Dialog()
         dialog.set_title(_("Edit Virtual Host: {name}").format(name=details.get('server_name', 'N/A')))
@@ -2814,7 +2841,9 @@ class MainWindow(Adw.ApplicationWindow):
         # Server name (read-only)
         servername_row = Adw.ActionRow()
         servername_row.set_title(_("Server Name"))
-        servername_label = Gtk.Label(label=details.get('server_name', 'N/A'))
+        server_name = details.get('server_name', 'N/A')
+        logger.info(f"Edit dialog - Server name: {server_name}")
+        servername_label = Gtk.Label(label=server_name)
         servername_label.set_selectable(True)
         servername_row.add_suffix(servername_label)
         basic_group.add(servername_row)
@@ -2822,7 +2851,9 @@ class MainWindow(Adw.ApplicationWindow):
         # Document root (read-only)
         docroot_row = Adw.ActionRow()
         docroot_row.set_title(_("Document Root"))
-        docroot_label = Gtk.Label(label=details.get('document_root', 'N/A'))
+        document_root = details.get('document_root', 'N/A')
+        logger.info(f"Edit dialog - Document root: {document_root}")
+        docroot_label = Gtk.Label(label=document_root)
         docroot_label.set_selectable(True)
         docroot_row.add_suffix(docroot_label)
         basic_group.add(docroot_row)
@@ -2844,6 +2875,7 @@ class MainWindow(Adw.ApplicationWindow):
         php_versions_list = [None]
         
         current_php = details.get('php_version', '')
+        logger.info(f"Edit dialog - Current PHP version: '{current_php}'")
         selected_index = 0
         
         for i, version in enumerate(php_versions, 1):
@@ -2851,9 +2883,11 @@ class MainWindow(Adw.ApplicationWindow):
             php_versions_list.append(version)
             if version == current_php:
                 selected_index = i
+                logger.info(f"Edit dialog - Matched PHP version at index {i}: {version}")
         
         php_row.set_model(php_model)
         php_row.set_selected(selected_index)
+        logger.info(f"Edit dialog - Selected index set to: {selected_index}")
         php_group.add(php_row)
         
         content_box.append(php_group)
@@ -2867,6 +2901,7 @@ class MainWindow(Adw.ApplicationWindow):
         ssl_status_row = Adw.ActionRow()
         ssl_status_row.set_title(_("SSL Status"))
         ssl_enabled = details.get('ssl', False)
+        logger.info(f"Edit dialog - SSL enabled: {ssl_enabled}")
         if ssl_enabled:
             ssl_label = Gtk.Label(label="✅ Enabled")
             ssl_label.add_css_class("success")
@@ -2886,6 +2921,8 @@ class MainWindow(Adw.ApplicationWindow):
             php_selected = php_row.get_selected()
             new_php_version = php_versions_list[php_selected]
             old_php_version = details.get('php_version', '')
+            
+            logger.info(f"Save clicked - Old: '{old_php_version}', New: '{new_php_version}'")
             
             # Check if PHP version changed
             if new_php_version != old_php_version:
@@ -2910,9 +2947,53 @@ class MainWindow(Adw.ApplicationWindow):
         save_button.connect("clicked", on_save_clicked)
         dialog.present(parent_dialog)
     
+    def _on_vhost_trust_ssl(self, service, details, parent_dialog):
+        """Trust SSL certificate for virtual host"""
+        server_name = details.get('server_name', '')
+        
+        if not server_name:
+            self._show_toast(_("Cannot determine server name"))
+            return
+        
+        # Confirmation dialog
+        dialog = Adw.MessageDialog.new(self)
+        dialog.set_heading(_("Trust SSL Certificate?"))
+        dialog.set_body(_("This will add the self-signed certificate for {name} to your system's trusted certificate store.\n\nAfter this, Chrome and other browsers will accept the certificate without warnings.\n\nYou may need to restart your browser.").format(name=server_name))
+        
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("trust", _("Trust Certificate"))
+        dialog.set_response_appearance("trust", Adw.ResponseAppearance.SUGGESTED)
+        
+        def on_response(dialog, response):
+            if response == "trust":
+                dialog.close()
+                self._show_toast(_("Adding certificate to trust store..."))
+                
+                # Run in thread
+                import threading
+                def trust_task():
+                    try:
+                        success, message = service.trust_ssl_certificate(server_name)
+                        def update_ui():
+                            self._show_toast(message)
+                            if success:
+                                parent_dialog.close()
+                                if self.current_service and self.current_service.name == service.name:
+                                    self._refresh_detail_page()
+                        GLib.idle_add(update_ui)
+                    except Exception as e:
+                        logger.error(f"Error trusting certificate: {e}")
+                        GLib.idle_add(self._show_toast, _("Error: {error}").format(error=str(e)))
+                
+                thread = threading.Thread(target=trust_task, daemon=True)
+                thread.start()
+        
+        dialog.connect("response", on_response)
+        dialog.present()
+    
     def _on_vhost_delete_confirm(self, service, details, parent_dialog):
         """Confirm and delete virtual host"""
-        dialog = Adw.MessageDialog.new(parent_dialog)
+        dialog = Adw.MessageDialog.new(self)
         dialog.set_heading(_("Delete {name}?").format(name=details.get('server_name', 'N/A')))
         dialog.set_body(_("This will permanently delete the virtual host configuration. The document root files will not be deleted."))
         

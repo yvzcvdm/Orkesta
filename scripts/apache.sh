@@ -653,6 +653,14 @@ EOF
         }
     fi
     
+    # Update /etc/hosts file
+    if ! grep -q "^127.0.0.1.*[[:space:]]$server_name" /etc/hosts; then
+        echo "127.0.0.1    $server_name www.$server_name" >> /etc/hosts
+        echo "✓ Added $server_name to /etc/hosts"
+    else
+        echo "✓ $server_name already exists in /etc/hosts"
+    fi
+    
     # Reload Apache
     local service_name=$(get_service_name)
     systemctl reload "$service_name" 2>&1
@@ -723,6 +731,12 @@ action_vhost_delete() {
     local vhost_dir=$(get_vhost_dir)
     local config_file="$vhost_dir/$filename"
     
+    # Get server name before deleting config file
+    local server_name=""
+    if [ -f "$config_file" ]; then
+        server_name=$(grep -m1 "^\s*ServerName" "$config_file" | sed 's/^\s*ServerName\s*//' | awk '{print $1}' | tr -d '"' | xargs)
+    fi
+    
     # Disable first (Debian/Ubuntu)
     if [ "$OS_TYPE" = "debian" ]; then
         a2dissite "$filename" 2>/dev/null || true
@@ -731,6 +745,14 @@ action_vhost_delete() {
     # Delete config file
     if [ -f "$config_file" ]; then
         rm -f "$config_file"
+        
+        # Remove from /etc/hosts if server_name was found
+        if [ -n "$server_name" ]; then
+            # Remove lines containing the server name
+            sed -i "/[[:space:]]$server_name\([[:space:]]\|$\)/d" /etc/hosts
+            sed -i "/[[:space:]]www\.$server_name\([[:space:]]\|$\)/d" /etc/hosts
+            echo "✓ Removed $server_name from /etc/hosts"
+        fi
         
         local service_name=$(get_service_name)
         systemctl reload "$service_name" 2>&1
@@ -766,20 +788,28 @@ action_vhost_details() {
         exit 1
     fi
     
-    # Parse config file
-    local server_name=$(grep -m1 "ServerName" "$config_file" | awk '{print $2}')
-    local document_root=$(grep -m1 "DocumentRoot" "$config_file" | awk '{print $2}')
+    # Parse config file - improved parsing
+    local server_name=$(grep -m1 "^\s*ServerName" "$config_file" | sed 's/^\s*ServerName\s*//' | awk '{print $1}')
+    local document_root=$(grep -m1 "^\s*DocumentRoot" "$config_file" | sed 's/^\s*DocumentRoot\s*//' | awk '{print $1}')
     local ssl_enabled=false
     local php_version=""
     
-    if grep -q "SSLEngine on" "$config_file"; then
+    # Clean up server_name and document_root (remove any trailing whitespace or quotes)
+    server_name=$(echo "$server_name" | tr -d '"' | xargs)
+    document_root=$(echo "$document_root" | tr -d '"' | xargs)
+    
+    # Check SSL
+    if grep -q "^\s*SSLEngine\s\+on" "$config_file"; then
         ssl_enabled=true
     fi
     
-    # Extract PHP version from config
+    # Extract PHP version from config - improved regex
     if grep -q "php.*fpm" "$config_file"; then
         php_version=$(grep -oP 'php\K[0-9]+\.[0-9]+' "$config_file" | head -n1)
     fi
+    
+    # Clean up php_version
+    php_version=$(echo "$php_version" | xargs)
     
     local enabled=true
     if [ "$OS_TYPE" = "debian" ]; then
@@ -788,6 +818,11 @@ action_vhost_details() {
             enabled=false
         fi
     fi
+    
+    # Ensure empty strings for missing values
+    [ -z "$server_name" ] && server_name=""
+    [ -z "$document_root" ] && document_root=""
+    [ -z "$php_version" ] && php_version=""
     
     if [ "$json_output" = true ]; then
         echo "{\"filename\":\"$filename\",\"server_name\":\"$server_name\",\"document_root\":\"$document_root\",\"ssl\":$ssl_enabled,\"php_version\":\"$php_version\",\"enabled\":$enabled}"
@@ -1402,6 +1437,90 @@ action_ssl_create_cert() {
     exit 0
 }
 
+action_ssl_trust_cert() {
+    local domain="$1"
+    
+    if [ -z "$domain" ]; then
+        echo "ERROR: domain is required"
+        exit 1
+    fi
+    
+    local cert_path="/etc/ssl/certs/${domain}.crt"
+    
+    # Check if certificate exists
+    if [ ! -f "$cert_path" ]; then
+        echo "ERROR: Certificate not found: $cert_path"
+        echo "Create the certificate first with: ssl-create-cert $domain"
+        exit 1
+    fi
+    
+    case "$OS_TYPE" in
+        debian)
+            # Ubuntu/Debian: Copy to ca-certificates and update
+            cp "$cert_path" "/usr/local/share/ca-certificates/${domain}.crt"
+            update-ca-certificates 2>&1
+            echo "✓ Certificate added to system trust store"
+            echo "✓ Chrome and other browsers will now trust this certificate"
+            echo "✓ You may need to restart your browser"
+            ;;
+        fedora)
+            # Fedora/RHEL: Copy to pki and update
+            cp "$cert_path" "/etc/pki/ca-trust/source/anchors/${domain}.crt"
+            update-ca-trust 2>&1
+            echo "✓ Certificate added to system trust store"
+            echo "✓ Chrome and other browsers will now trust this certificate"
+            echo "✓ You may need to restart your browser"
+            ;;
+        arch)
+            # Arch: Copy to ca-certificates and update
+            cp "$cert_path" "/etc/ca-certificates/trust-source/anchors/${domain}.crt"
+            trust extract-compat 2>&1
+            echo "✓ Certificate added to system trust store"
+            echo "✓ Chrome and other browsers will now trust this certificate"
+            echo "✓ You may need to restart your browser"
+            ;;
+        *)
+            echo "ERROR: Certificate trust management not supported on this OS"
+            exit 1
+            ;;
+    esac
+    
+    exit 0
+}
+
+action_ssl_untrust_cert() {
+    local domain="$1"
+    
+    if [ -z "$domain" ]; then
+        echo "ERROR: domain is required"
+        exit 1
+    fi
+    
+    case "$OS_TYPE" in
+        debian)
+            rm -f "/usr/local/share/ca-certificates/${domain}.crt"
+            update-ca-certificates 2>&1
+            echo "✓ Certificate removed from system trust store"
+            ;;
+        fedora)
+            rm -f "/etc/pki/ca-trust/source/anchors/${domain}.crt"
+            update-ca-trust 2>&1
+            echo "✓ Certificate removed from system trust store"
+            ;;
+        arch)
+            rm -f "/etc/ca-certificates/trust-source/anchors/${domain}.crt"
+            trust extract-compat 2>&1
+            echo "✓ Certificate removed from system trust store"
+            ;;
+        *)
+            echo "ERROR: Certificate trust management not supported on this OS"
+            exit 1
+            ;;
+    esac
+    
+    exit 0
+}
+
 ################################################################################
 # MAIN
 ################################################################################
@@ -1461,6 +1580,8 @@ main() {
         ssl-is-enabled)     action_ssl_is_enabled ;;
         ssl-enable)         action_ssl_enable ;;
         ssl-create-cert)    action_ssl_create_cert "$@" ;;
+        ssl-trust-cert)     action_ssl_trust_cert "$@" ;;
+        ssl-untrust-cert)   action_ssl_untrust_cert "$@" ;;
         
         # Help
         --help|help)
@@ -1512,6 +1633,8 @@ SSL MANAGEMENT:
   ssl-is-enabled                Check if SSL module is enabled
   ssl-enable                    Enable SSL module
   ssl-create-cert <domain>      Create self-signed SSL certificate
+  ssl-trust-cert <domain>       Add certificate to system trust store (fix browser warnings)
+  ssl-untrust-cert <domain>     Remove certificate from system trust store
 
 EXAMPLES:
   # Install Apache

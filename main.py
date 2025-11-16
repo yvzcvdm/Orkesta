@@ -8,6 +8,11 @@ Prensip: Main SADECE GTK arayüzünü başlatır, servis mantığı içermez
 
 import sys
 import os
+import warnings
+
+# GTK tema uyarılarını bastır (uygulamayı etkilemez)
+warnings.filterwarnings("ignore", category=Warning)
+os.environ['G_MESSAGES_DEBUG'] = ''
 
 # Proje dizinini path'e ekle
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

@@ -239,3 +239,11 @@ class ApacheService(BaseService):
                 'key_path': key_path or f"/etc/ssl/private/{domain}.key"
             }
         return success, message, cert_info
+    
+    def trust_ssl_certificate(self, domain: str) -> Tuple[bool, str]:
+        """Add SSL certificate to system trust store"""
+        return self._execute_script(self.SCRIPT_NAME, 'ssl-trust-cert', domain, timeout=30)
+    
+    def untrust_ssl_certificate(self, domain: str) -> Tuple[bool, str]:
+        """Remove SSL certificate from system trust store"""
+        return self._execute_script(self.SCRIPT_NAME, 'ssl-untrust-cert', domain, timeout=30)
