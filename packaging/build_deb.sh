@@ -37,6 +37,37 @@ EOF
 
 # Optional: set maintainer scripts here (postinst/prerm) if needed
 
+# Add maintainer scripts to install/remove sudoers entry allowing
+# running Orkesta scripts without password for members of 'sudo' group.
+# This is a pragmatic shortcut for desktop usage where GUI cannot prompt
+# for a password. Consider replacing with a polkit/pkexec flow for
+# better security in the long term.
+cat > "$BUILD_DIR/DEBIAN/postinst" <<'POSTINST'
+#!/bin/sh
+set -e
+# Create sudoers file to allow running orkesta scripts without password
+SUDOERS_FILE=/etc/sudoers.d/orkesta
+cat > "$SUDOERS_FILE" <<'EOL'
+# Orkesta: allow members of 'sudo' group to run Orkesta scripts without password
+%sudo ALL=(ALL) NOPASSWD: /opt/orkesta/scripts/*
+EOL
+chmod 0440 "$SUDOERS_FILE" || true
+exit 0
+POSTINST
+chmod 0755 "$BUILD_DIR/DEBIAN/postinst"
+
+cat > "$BUILD_DIR/DEBIAN/postrm" <<'POSTRM'
+#!/bin/sh
+set -e
+case "$1" in
+  remove|purge)
+    rm -f /etc/sudoers.d/orkesta || true
+    ;;
+esac
+exit 0
+POSTRM
+chmod 0755 "$BUILD_DIR/DEBIAN/postrm"
+
 # Copy project to /opt/orkesta
 rsync -a --exclude='.git' --exclude='build' --exclude='packaging' ./ "$BUILD_DIR/opt/$PKG_NAME/"
 
@@ -69,6 +100,16 @@ chmod -R 755 "$BUILD_DIR/opt/$PKG_NAME"
 find "$BUILD_DIR" -type d -exec chmod 0755 {} +
 find "$BUILD_DIR" -type f -exec chmod 0644 {} +
 
+# DEBIAN maintainer scriptleri dpkg-deb tarafından yürütülebilir olmalıdır;
+# yukarıdaki find komutu tüm dosyaları 0644 yaptıktan sonra burada tekrar
+# postinst/postrm için exec biti yeniden veriyoruz.
+if [ -f "$BUILD_DIR/DEBIAN/postinst" ]; then
+  chmod 0755 "$BUILD_DIR/DEBIAN/postinst" || true
+fi
+if [ -f "$BUILD_DIR/DEBIAN/postrm" ]; then
+  chmod 0755 "$BUILD_DIR/DEBIAN/postrm" || true
+fi
+
 # Ensure executables keep exec bit (wrapper and any scripts)
 if [ -f "$BUILD_DIR/usr/bin/orkesta" ]; then
   chmod 0755 "$BUILD_DIR/usr/bin/orkesta"
@@ -93,8 +134,15 @@ fi
 
 # Move generated .deb back to project root if created in temp
 if [ -f "$OUTPUT_DEB" ]; then
-  mv -f "$OUTPUT_DEB" "$FINAL_OUTPUT_DIR/"
-  echo "Moved $OUTPUT_DEB to $FINAL_OUTPUT_DIR/"
+  # Avoid mv error when source and destination are the same path
+  SRC_REAL=$(readlink -f "$OUTPUT_DEB") || SRC_REAL="$OUTPUT_DEB"
+  DST_REAL=$(readlink -f "$FINAL_OUTPUT_DIR/$OUTPUT_DEB") || DST_REAL="$FINAL_OUTPUT_DIR/$OUTPUT_DEB"
+  if [ "$SRC_REAL" != "$DST_REAL" ]; then
+    mv -f "$OUTPUT_DEB" "$FINAL_OUTPUT_DIR/"
+    echo "Moved $OUTPUT_DEB to $FINAL_OUTPUT_DIR/"
+  else
+    echo "$OUTPUT_DEB already in $FINAL_OUTPUT_DIR/"
+  fi
 fi
 
 # Copy build folder back into repository for inspection (optional)
