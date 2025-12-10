@@ -1,5 +1,7 @@
 # Orkesta
 
+![Orkesta Screenshot](screenshot.png)
+
 Orkesta, geliştiriciler için Apache / MySQL / PHP gibi yerel servisleri yönetmeyi kolaylaştıran modern bir GTK4 + Libadwaita masaüstü uygulamasıdır. Basit bir GUI ile servisleri kurma, başlatma/durdurma, yeniden başlatma ve yapılandırma işlemlerini script tabanlı bir yaklaşımla gerçekleştirir.
 
 **Kısa Özeti:** Orkesta, geliştirici makinelerinde web geliştirme ortamlarını hızlıca yönetmek için tasarlanmış, lehine kolaylık ve açıklık sağlayan bir araçtır.
