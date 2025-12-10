@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Orkesta
+Comment=Web Development Environment Manager
+Exec=orkesta
+Icon=orkesta
+Terminal=false
+Type=Application
+Categories=Development;System;
