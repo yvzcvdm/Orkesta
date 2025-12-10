@@ -1,6 +1,8 @@
 # Orkesta
 
 ![Orkesta Screenshot](screenshot.png)
+ 
+[Download .deb (v0.1.0)](https://github.com/yvzcvdm/Orkesta/releases/download/0.1.0/orkesta_0.1.0.deb)
 
 Orkesta, geliştiriciler için Apache / MySQL / PHP gibi yerel servisleri yönetmeyi kolaylaştıran modern bir GTK4 + Libadwaita masaüstü uygulamasıdır. Basit bir GUI ile servisleri kurma, başlatma/durdurma, yeniden başlatma ve yapılandırma işlemlerini script tabanlı bir yaklaşımla gerçekleştirir.
 
