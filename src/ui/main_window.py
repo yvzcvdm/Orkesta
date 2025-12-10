@@ -18,6 +18,15 @@ logger = logging.getLogger(__name__)
 # Çeviri fonksiyonu
 _ = get_i18n().get_translator()
 
+# Yerel ikon haritası: servis adı -> proje içindeki ikon dosyası
+import os
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ICON_MAP = {
+    'apache': os.path.join(PROJECT_ROOT, 'ui', 'icons', 'apache.svg'),
+    'mysql': os.path.join(PROJECT_ROOT, 'ui', 'icons', 'mysql.svg'),
+    'php': os.path.join(PROJECT_ROOT, 'ui', 'icons', 'php.svg'),
+}
+
 
 class MainWindow(Adw.ApplicationWindow):
     """Ana uygulama penceresi"""
@@ -354,8 +363,13 @@ class MainWindow(Adw.ApplicationWindow):
         left_box.set_spacing(12)
         left_box.set_hexpand(True)
         
-        # İkon (büyük)
-        icon = Gtk.Image.new_from_icon_name(service.icon_name)
+        # İkon (büyük) - öncelikle proje içi SVG ikonlarını dene
+        icon_path = ICON_MAP.get(service.name)
+        if icon_path and os.path.exists(icon_path):
+            icon = Gtk.Image.new_from_file(icon_path)
+        else:
+            # Varsayılan olarak servis tarafından sağlanan ikon ismini kullan
+            icon = Gtk.Image.new_from_icon_name(service.icon_name)
         icon.set_pixel_size(40)
         left_box.append(icon)
         
@@ -914,17 +928,7 @@ class MainWindow(Adw.ApplicationWindow):
         if service.name == "php" and service.is_installed():
             self._add_php_sections(main_box, service)
         
-        # Configuration section (placeholder)
-        config_group = Adw.PreferencesGroup()
-        config_group.set_title(_("Configuration"))
-        config_group.set_description(_("Configuration options coming soon"))
-        main_box.append(config_group)
-        
-        # Logs section (placeholder)
-        logs_group = Adw.PreferencesGroup()
-        logs_group.set_title(_("Logs"))
-        logs_group.set_description(_("Log viewer coming soon"))
-        main_box.append(logs_group)
+        # (Removed unused placeholder Configuration and Logs sections)
         
         scrolled.set_child(main_box)
         return scrolled
@@ -1467,36 +1471,7 @@ class MainWindow(Adw.ApplicationWindow):
             
             main_box.append(extensions_group)
             
-            # Configuration Information
-            config_group = Adw.PreferencesGroup()
-            config_group.set_title(_("Configuration"))
-            
-            # Config file location
-            if 'config_file' in config_info:
-                config_file_row = Adw.ActionRow()
-                config_file_row.set_title(_("Configuration File"))
-                config_file_row.set_subtitle(config_info['config_file'])
-                config_group.add(config_file_row)
-            
-            # Memory limit
-            if 'memory_limit' in config_info:
-                memory_row = Adw.ActionRow()
-                memory_row.set_title(_("Memory Limit"))
-                memory_label = Gtk.Label(label=config_info['memory_limit'])
-                memory_label.add_css_class("monospace")
-                memory_row.add_suffix(memory_label)
-                config_group.add(memory_row)
-            
-            # Upload max size
-            if 'upload_max_size' in config_info:
-                upload_row = Adw.ActionRow()
-                upload_row.set_title(_("Upload Max Size"))
-                upload_label = Gtk.Label(label=config_info['upload_max_size'])
-                upload_label.add_css_class("monospace")
-                upload_row.add_suffix(upload_label)
-                config_group.add(upload_row)
-            
-            main_box.append(config_group)
+            # (Removed per-service Configuration information block)
             
         except Exception as e:
             logger.error(f"Error adding PHP sections: {e}")
