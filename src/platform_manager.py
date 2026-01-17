@@ -71,17 +71,17 @@ class PlatformManager:
                     self.os_name = os_info.get('NAME', 'Unknown')
                     self.os_version = os_info.get('VERSION_ID', 'Unknown')
                     
-                    # OS tipini belirle
-                    if 'fedora' in os_id:
+                    # OS tipini belirle (ID_LIKE'ı daha kapsamlı kontrol et)
+                    if 'fedora' in os_id or 'fedora' in id_like:
                         self.os_type = OSType.FEDORA
-                    elif 'ubuntu' in os_id:
+                    elif 'ubuntu' in os_id or 'ubuntu' in id_like:
                         self.os_type = OSType.UBUNTU
                     elif 'debian' in os_id or 'debian' in id_like:
                         self.os_type = OSType.DEBIAN
-                    elif 'arch' in os_id or 'arch' in id_like:
+                    elif 'arch' in os_id or 'arch' in id_like or 'manjaro' in os_id:
                         self.os_type = OSType.ARCH
                     else:
-                        logger.warning(f"Desteklenmeyen OS: {os_id}")
+                        logger.warning(f"Desteklenmeyen OS: {os_id} (ID_LIKE: {id_like})")
                         self.os_type = OSType.UNKNOWN
                     
                     logger.info(f"OS tespit edildi: {self.os_type.value} - {self.os_name} {self.os_version}")

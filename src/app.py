@@ -63,34 +63,23 @@ class OrkestaApp(Adw.Application):
             sys.exit(1)
     
     def _initialize_sudo_cache(self):
-        """Sudo cache'i başlat - sistem dialog ile"""
+        """pkexec authentication - GUI uygulamalar için sistem dialogu"""
         import subprocess
         
+        # pkexec her zaman GUI dialog açar, cache kontrolüne gerek yok
+        # Sadece pkexec'in çalışıp çalışmadığını test edelim
         try:
-            # Sudo cache'de var mı kontrol et
-            result = subprocess.run(['sudo', '-n', 'true'], capture_output=True, timeout=1)
+            result = subprocess.run(
+                ['pkexec', '--version'], 
+                capture_output=True, 
+                timeout=5
+            )
             if result.returncode == 0:
-                # Zaten cache'de var
-                print("✅ Sudo zaten yetkilendirilmiş")
-                return False
-        except:
-            pass
-        
-        # Cache'de yok, pkexec veya sudo ile şifre iste
-        try:
-            # pkexec kullan (GUI dialog)
-            result = subprocess.run(['pkexec', 'true'], capture_output=True, timeout=30)
-            if result.returncode == 0:
-                print("✅ Sudo yetkilendirmesi başarılı")
+                print("✅ pkexec hazır - GUI yetkilendirme kullanılabilir")
             else:
-                print("⚠️ Sudo yetkilendirmesi iptal edildi veya başarısız")
-        except:
-            try:
-                # Fallback: sudo ile (terminal'de çalışırsa)
-                subprocess.run(['sudo', 'true'], timeout=30, check=True)
-                print("✅ Sudo yetkilendirmesi başarılı")
-            except:
-                print("⚠️ Sudo yetkilendirmesi yapılamadı")
+                print("⚠️ pkexec mevcut değil - bazı işlemler başarısız olabilir")
+        except Exception as e:
+            print(f"⚠️ pkexec kontrolü başarısız: {e}")
         
         return False  # Don't repeat timeout
     

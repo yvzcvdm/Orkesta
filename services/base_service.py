@@ -169,7 +169,8 @@ class BaseService(ABC):
         # Komutu oluştur
         cmd = []
         if needs_sudo:
-            cmd.append('sudo')
+            # pkexec kullan - GUI uygulamalarda çalışır, sistem auth dialogu açar
+            cmd.append('pkexec')
         
         cmd.append(script_path)
         cmd.extend(args)

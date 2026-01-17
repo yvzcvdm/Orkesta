@@ -19,12 +19,13 @@ logger = logging.getLogger(__name__)
 _ = get_i18n().get_translator()
 
 # Yerel ikon haritası: servis adı -> proje içindeki ikon dosyası
+# Bu dosya src/ui/main_window.py - ikonlar src/ui/icons/ içinde
 import os
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))  # src/ui/
 ICON_MAP = {
-    'apache': os.path.join(PROJECT_ROOT, 'ui', 'icons', 'apache.svg'),
-    'mysql': os.path.join(PROJECT_ROOT, 'ui', 'icons', 'mysql.svg'),
-    'php': os.path.join(PROJECT_ROOT, 'ui', 'icons', 'php.svg'),
+    'apache': os.path.join(_CURRENT_DIR, 'icons', 'apache.svg'),
+    'mysql': os.path.join(_CURRENT_DIR, 'icons', 'mysql.svg'),
+    'php': os.path.join(_CURRENT_DIR, 'icons', 'php.svg'),
 }
 
 
