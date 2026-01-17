@@ -10,9 +10,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Import i18n
+# Import standalone i18n (bağımsız)
 try:
-    from src.utils.i18n import get_i18n
+    from .i18n import get_i18n
     _ = get_i18n().get_translator()
 except:
     _ = lambda s: s
@@ -256,4 +256,31 @@ class ApacheService(BaseService):
     
     def untrust_ssl_certificate(self, domain: str) -> Tuple[bool, str]:
         """Remove SSL certificate from system trust store"""
-        return self._execute_script(self.SCRIPT_NAME, 'ssl-untrust-cert', domain, timeout=30)
+        return self._execute_script(self.SCRIPT_NAME, 'ssl-untrust-cert', domain, timeout=30)    
+    # ==================== PORT MANAGEMENT ====================
+    
+    def list_ports(self) -> List[Dict[str, Any]]:
+        """List all configured Apache ports"""
+        success, output = self._execute_script(self.SCRIPT_NAME, 'port-list', '--json', timeout=10)
+        if not success:
+            return []
+        try:
+            import json
+            return json.loads(output)
+        except:
+            return []
+    
+    def add_port(self, port: int, ssl: bool = False) -> Tuple[bool, str]:
+        """Add a new port to Apache configuration"""
+        args = ['port-add', str(port)]
+        if ssl:
+            args.append('--ssl')
+        return self._execute_script(self.SCRIPT_NAME, *args, timeout=30)
+    
+    def remove_port(self, port: int) -> Tuple[bool, str]:
+        """Remove a port from Apache configuration"""
+        return self._execute_script(self.SCRIPT_NAME, 'port-remove', str(port), timeout=30)
+    
+    def set_port(self, old_port: int, new_port: int) -> Tuple[bool, str]:
+        """Change a port number (updates all vhosts using that port)"""
+        return self._execute_script(self.SCRIPT_NAME, 'port-set', str(old_port), str(new_port), timeout=60)

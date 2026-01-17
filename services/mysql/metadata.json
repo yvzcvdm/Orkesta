@@ -5,7 +5,9 @@
   "author": "Orkesta Team",
   "description": "MySQL/MariaDB database server management",
   "icon": "server-database-symbolic",
+  "icon_path": "icon.svg",
   "category": "database",
+  "entry_class": "MySQLService",
   "requires": [],
   "enabled": true
 }

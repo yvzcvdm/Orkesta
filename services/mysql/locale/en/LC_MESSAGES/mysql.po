@@ -1,0 +1,43 @@
+# MySQL Service - English Translation
+# Copyright (C) 2026 Orkesta Team
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: MySQL Service 1.0\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "MySQL Database Server"
+msgstr "MySQL Database Server"
+
+msgid "Install"
+msgstr "Install"
+
+msgid "Uninstall"
+msgstr "Uninstall"
+
+msgid "Start"
+msgstr "Start"
+
+msgid "Stop"
+msgstr "Stop"
+
+msgid "Databases"
+msgstr "Databases"
+
+msgid "Create Database"
+msgstr "Create Database"
+
+msgid "Database Name"
+msgstr "Database Name"
+
+msgid "Root Password"
+msgstr "Root Password"
+
+msgid "Users"
+msgstr "Users"
+
+msgid "Create User"
+msgstr "Create User"

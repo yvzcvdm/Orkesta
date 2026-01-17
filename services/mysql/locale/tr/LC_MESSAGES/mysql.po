@@ -1,0 +1,43 @@
+# MySQL Service - Turkish Translation
+# Copyright (C) 2026 Orkesta Team
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: MySQL Service 1.0\n"
+"Language: tr\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "MySQL Database Server"
+msgstr "MySQL Veritabanı Sunucusu"
+
+msgid "Install"
+msgstr "Kur"
+
+msgid "Uninstall"
+msgstr "Kaldır"
+
+msgid "Start"
+msgstr "Başlat"
+
+msgid "Stop"
+msgstr "Durdur"
+
+msgid "Databases"
+msgstr "Veritabanları"
+
+msgid "Create Database"
+msgstr "Veritabanı Oluştur"
+
+msgid "Database Name"
+msgstr "Veritabanı Adı"
+
+msgid "Root Password"
+msgstr "Root Şifresi"
+
+msgid "Users"
+msgstr "Kullanıcılar"
+
+msgid "Create User"
+msgstr "Kullanıcı Oluştur"

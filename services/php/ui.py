@@ -9,8 +9,8 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw
 import logging
-from src.ui.services.base_view import BaseServiceView
-from src.utils.i18n import get_i18n
+from ui.services.base_view import BaseServiceView
+from utils.i18n import get_i18n
 
 logger = logging.getLogger(__name__)
 _ = get_i18n().get_translator()

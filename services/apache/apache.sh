@@ -107,7 +107,15 @@ get_vhost_dir() {
             echo "/etc/apache2/sites-available"
             ;;
         arch)
-            echo "/etc/httpd/conf/extra"
+            # Create vhosts directory if doesn't exist
+            local vhost_dir="/etc/httpd/conf/vhosts"
+            if [ ! -d "$vhost_dir" ]; then
+                mkdir -p "$vhost_dir"
+                # Add include to main conf if not exists
+                grep -q "IncludeOptional conf/vhosts/\*.conf" /etc/httpd/conf/httpd.conf || \
+                    echo "IncludeOptional conf/vhosts/*.conf" >> /etc/httpd/conf/httpd.conf
+            fi
+            echo "$vhost_dir"
             ;;
     esac
 }
@@ -620,11 +628,12 @@ EOF
     
     # Add PHP-FPM configuration if specified
     if [ -n "$php_version" ]; then
+        local php_socket=$(get_php_fpm_socket "$php_version")
         cat >> "$config_file" <<EOF
     
     # PHP-FPM Configuration
     <FilesMatch \.php$>
-        SetHandler "proxy:unix:/run/php/php${php_version}-fpm.sock|fcgi://localhost"
+        SetHandler "proxy:unix:${php_socket}|fcgi://localhost"
     </FilesMatch>
 EOF
     fi
@@ -635,15 +644,19 @@ EOF
     if [ "$ssl" = true ]; then
         # Use provided certs or generate self-signed
         if [ -z "$ssl_cert" ]; then
-            ssl_cert="/etc/ssl/certs/${server_name}.crt"
+            local cert_dir=$(get_ssl_cert_dir)
+            ssl_cert="${cert_dir}/${server_name}.crt"
         fi
         if [ -z "$ssl_key" ]; then
-            ssl_key="/etc/ssl/private/${server_name}.key"
+            local key_dir=$(get_ssl_key_dir)
+            ssl_key="${key_dir}/${server_name}.key"
         fi
         
         # Generate self-signed certificate if not exists
         if [ ! -f "$ssl_cert" ] || [ ! -f "$ssl_key" ]; then
-            mkdir -p /etc/ssl/certs /etc/ssl/private
+            local cert_dir=$(get_ssl_cert_dir)
+            local key_dir=$(get_ssl_key_dir)
+            mkdir -p "$cert_dir" "$key_dir"
             openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 \
                 -subj "/C=US/ST=State/L=City/O=Organization/CN=$server_name" \
                 -keyout "$ssl_key" -out "$ssl_cert" 2>&1
@@ -673,11 +686,12 @@ EOF
 EOF
         
         if [ -n "$php_version" ]; then
+            local php_socket=$(get_php_fpm_socket "$php_version")
             cat >> "$config_file" <<EOF
     
     # PHP-FPM Configuration
     <FilesMatch \.php$>
-        SetHandler "proxy:unix:/run/php/php${php_version}-fpm.sock|fcgi://localhost"
+        SetHandler "proxy:unix:${php_socket}|fcgi://localhost"
     </FilesMatch>
 EOF
         fi
@@ -1382,6 +1396,280 @@ action_module_disable() {
 }
 
 ################################################################################
+# PORT MANAGEMENT
+################################################################################
+
+# Get ports.conf file path
+get_ports_conf() {
+    case "$OS_TYPE" in
+        fedora)
+            # Create separate ports.conf if doesn't exist
+            local ports_file="/etc/httpd/conf.d/orkesta-ports.conf"
+            if [ ! -f "$ports_file" ]; then
+                echo "# Orkesta Apache Ports Configuration" > "$ports_file"
+                echo "Listen 80" >> "$ports_file"
+            fi
+            echo "$ports_file"
+            ;;
+        arch)
+            # Create separate ports.conf if doesn't exist
+            local ports_file="/etc/httpd/conf/extra/orkesta-ports.conf"
+            if [ ! -f "$ports_file" ]; then
+                echo "# Orkesta Apache Ports Configuration" > "$ports_file"
+                echo "Listen 80" >> "$ports_file"
+                # Add include to main conf if not exists
+                grep -q "Include conf/extra/orkesta-ports.conf" /etc/httpd/conf/httpd.conf || \
+                    echo "Include conf/extra/orkesta-ports.conf" >> /etc/httpd/conf/httpd.conf
+            fi
+            echo "$ports_file"
+            ;;
+        debian)
+            echo "/etc/apache2/ports.conf"
+            ;;
+    esac
+}
+
+# Get PHP-FPM socket path
+get_php_fpm_socket() {
+    local php_version="$1"
+    case "$OS_TYPE" in
+        fedora)
+            # Fedora uses php-fpm with different socket naming
+            if [ -n "$php_version" ]; then
+                echo "/var/run/php-fpm/php${php_version}-fpm.sock"
+            else
+                echo "/var/run/php-fpm/www.sock"
+            fi
+            ;;
+        arch)
+            # Arch uses single php-fpm socket
+            echo "/run/php-fpm/php-fpm.sock"
+            ;;
+        debian)
+            # Debian/Ubuntu uses version-specific sockets
+            echo "/run/php/php${php_version}-fpm.sock"
+            ;;
+    esac
+}
+
+# Get SSL certificate directory
+get_ssl_cert_dir() {
+    case "$OS_TYPE" in
+        fedora)
+            echo "/etc/pki/tls/certs"
+            ;;
+        *)
+            echo "/etc/ssl/certs"
+            ;;
+    esac
+}
+
+# Get SSL private key directory
+get_ssl_key_dir() {
+    case "$OS_TYPE" in
+        fedora)
+            echo "/etc/pki/tls/private"
+            ;;
+        *)
+            echo "/etc/ssl/private"
+            ;;
+    esac
+}
+
+# Get main config file path
+get_main_conf() {
+    case "$OS_TYPE" in
+        fedora|arch)
+            echo "$(get_config_dir)/conf/httpd.conf"
+            ;;
+        debian)
+            echo "/etc/apache2/apache2.conf"
+            ;;
+    esac
+}
+
+action_port_list() {
+    local json_output=false
+    
+    if [ "$1" = "--json" ]; then
+        json_output=true
+    fi
+    
+    local ports_conf=$(get_ports_conf)
+    local ports=()
+    
+    # Extract Listen directives
+    if [ -f "$ports_conf" ]; then
+        while IFS= read -r line; do
+            # Match "Listen 80" or "Listen *:80" or "Listen 0.0.0.0:80"
+            if echo "$line" | grep -qE "^[[:space:]]*Listen[[:space:]]"; then
+                local port=$(echo "$line" | sed -E 's/^[[:space:]]*Listen[[:space:]]+([^:]*:)?([0-9]+).*/\2/')
+                if [ -n "$port" ]; then
+                    ports+=("$port")
+                fi
+            fi
+        done < "$ports_conf"
+    fi
+    
+    # Remove duplicates and sort
+    ports=($(printf '%s\n' "${ports[@]}" | sort -u))
+    
+    if [ "$json_output" = true ]; then
+        echo -n "["
+        local first=true
+        for port in "${ports[@]}"; do
+            if [ "$first" = true ]; then
+                first=false
+            else
+                echo -n ","
+            fi
+            
+            # Check if SSL port (443, 8443, etc.)
+            local is_ssl=false
+            if [ "$port" = "443" ] || [ "$port" = "8443" ]; then
+                is_ssl=true
+            fi
+            
+            echo -n "{\"port\":$port,\"ssl\":$is_ssl}"
+        done
+        echo "]"
+    else
+        for port in "${ports[@]}"; do
+            echo "$port"
+        done
+    fi
+    
+    exit 0
+}
+
+action_port_add() {
+    local port="$1"
+    local ssl=false
+    
+    shift
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --ssl)
+                ssl=true
+                shift
+                ;;
+            *)
+                shift
+                ;;
+        esac
+    done
+    
+    if [ -z "$port" ]; then
+        echo "ERROR: port number is required"
+        exit 1
+    fi
+    
+    # Validate port number
+    if ! [[ "$port" =~ ^[0-9]+$ ]] || [ "$port" -lt 1 ] || [ "$port" -gt 65535 ]; then
+        echo "ERROR: Invalid port number. Must be between 1-65535"
+        exit 1
+    fi
+    
+    local ports_conf=$(get_ports_conf)
+    
+    # Check if port already exists
+    if grep -qE "^[[:space:]]*Listen[[:space:]]+([^:]*:)?${port}([[:space:]]|$)" "$ports_conf" 2>/dev/null; then
+        echo "Port $port is already configured"
+        exit 0
+    fi
+    
+    # Add Listen directive
+    echo "Listen $port" >> "$ports_conf"
+    
+    # If SSL port and SSL module not enabled, enable it
+    if [ "$ssl" = true ]; then
+        if [ "$OS_TYPE" = "debian" ]; then
+            a2enmod ssl >/dev/null 2>&1 || true
+        fi
+    fi
+    
+    # Reload Apache
+    local service_name=$(get_service_name)
+    if systemctl reload "$service_name" 2>&1; then
+        echo "Port $port added successfully"
+    else
+        echo "ERROR: Failed to reload Apache. Check configuration."
+        exit 1
+    fi
+    
+    exit 0
+}
+
+action_port_remove() {
+    local port="$1"
+    
+    if [ -z "$port" ]; then
+        echo "ERROR: port number is required"
+        exit 1
+    fi
+    
+    # Don't allow removing default HTTP/HTTPS ports without confirmation
+    if [ "$port" = "80" ] || [ "$port" = "443" ]; then
+        echo "WARNING: Removing default port $port may break virtual hosts"
+    fi
+    
+    local ports_conf=$(get_ports_conf)
+    
+    # Remove Listen directive
+    sed -i "/^[[:space:]]*Listen[[:space:]]\+\([^:]*:\)\?${port}\([[:space:]]\|$\)/d" "$ports_conf"
+    
+    # Reload Apache
+    local service_name=$(get_service_name)
+    if systemctl reload "$service_name" 2>&1; then
+        echo "Port $port removed successfully"
+    else
+        echo "ERROR: Failed to reload Apache. Check configuration."
+        exit 1
+    fi
+    
+    exit 0
+}
+
+action_port_set() {
+    local old_port="$1"
+    local new_port="$2"
+    
+    if [ -z "$old_port" ] || [ -z "$new_port" ]; then
+        echo "ERROR: old_port and new_port are required"
+        exit 1
+    fi
+    
+    # Validate new port number
+    if ! [[ "$new_port" =~ ^[0-9]+$ ]] || [ "$new_port" -lt 1 ] || [ "$new_port" -gt 65535 ]; then
+        echo "ERROR: Invalid port number. Must be between 1-65535"
+        exit 1
+    fi
+    
+    local ports_conf=$(get_ports_conf)
+    
+    # Replace port in Listen directive
+    sed -i "s/^[[:space:]]*Listen[[:space:]]\+\([^:]*:\)\?${old_port}\([[:space:]]\|$\)/Listen \1${new_port}\2/" "$ports_conf"
+    
+    # Update VirtualHost directives in all conf files
+    local vhost_dir=$(get_vhost_dir)
+    if [ -d "$vhost_dir" ]; then
+        find "$vhost_dir" -name "*.conf" -type f -exec \
+            sed -i "s/<VirtualHost \*:${old_port}>/<VirtualHost *:${new_port}>/" {} \;
+    fi
+    
+    # Reload Apache
+    local service_name=$(get_service_name)
+    if systemctl reload "$service_name" 2>&1; then
+        echo "Port changed from $old_port to $new_port successfully"
+    else
+        echo "ERROR: Failed to reload Apache. Check configuration."
+        exit 1
+    fi
+    
+    exit 0
+}
+
+################################################################################
 # SSL MANAGEMENT
 ################################################################################
 
@@ -1451,16 +1739,20 @@ action_ssl_create_cert() {
         exit 1
     fi
     
-    # Set default paths
+    # Set default paths using OS-specific directories
     if [ -z "$cert_path" ]; then
-        cert_path="/etc/ssl/certs/${domain}.crt"
+        local cert_dir=$(get_ssl_cert_dir)
+        cert_path="${cert_dir}/${domain}.crt"
     fi
     if [ -z "$key_path" ]; then
-        key_path="/etc/ssl/private/${domain}.key"
+        local key_dir=$(get_ssl_key_dir)
+        key_path="${key_dir}/${domain}.key"
     fi
     
     # Create directories
-    mkdir -p /etc/ssl/certs /etc/ssl/private
+    local cert_dir=$(get_ssl_cert_dir)
+    local key_dir=$(get_ssl_key_dir)
+    mkdir -p "$cert_dir" "$key_dir"
     
     # Generate self-signed certificate
     openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 \
@@ -1485,7 +1777,8 @@ action_ssl_trust_cert() {
         exit 1
     fi
     
-    local cert_path="/etc/ssl/certs/${domain}.crt"
+    local cert_dir=$(get_ssl_cert_dir)
+    local cert_path="${cert_dir}/${domain}.crt"
     
     # Check if certificate exists
     if [ ! -f "$cert_path" ]; then
@@ -1616,6 +1909,12 @@ main() {
         php-module-install)      action_php_module_install "$@" ;;
         php-module-uninstall)    action_php_module_uninstall "$@" ;;
         
+        # Port management
+        port-list)          action_port_list "$@" ;;
+        port-add)           action_port_add "$@" ;;
+        port-remove)        action_port_remove "$@" ;;
+        port-set)           action_port_set "$@" ;;
+        
         # SSL management
         ssl-is-enabled)     action_ssl_is_enabled ;;
         ssl-enable)         action_ssl_enable ;;
@@ -1669,6 +1968,12 @@ PHP APACHE MODULE MANAGEMENT:
   php-module-install [version]  Install PHP Apache module
   php-module-uninstall [ver]    Uninstall PHP Apache module
 
+PORT MANAGEMENT:
+  port-list [--json]            List all configured ports
+  port-add <port> [--ssl]       Add a new port to Apache configuration
+  port-remove <port>            Remove a port from Apache configuration
+  port-set <old> <new>          Change a port number (updates all vhosts)
+
 SSL MANAGEMENT:
   ssl-is-enabled                Check if SSL module is enabled
   ssl-enable                    Enable SSL module
@@ -1679,6 +1984,12 @@ SSL MANAGEMENT:
 EXAMPLES:
   # Install Apache
   sudo ./apache.sh install
+  
+  # Add custom port
+  sudo ./apache.sh port-add 8080
+  
+  # Change default HTTP port from 80 to 8080
+  sudo ./apache.sh port-set 80 8080
   
   # Create a virtual host
   sudo ./apache.sh vhost-create example.com /var/www/example

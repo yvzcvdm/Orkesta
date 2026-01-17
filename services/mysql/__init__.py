@@ -11,10 +11,12 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Simple translation function - using English for now
-def _(text):
-    """Simple translation function"""
-    return text
+# Import standalone i18n (bağımsız)
+try:
+    from .i18n import get_i18n
+    _ = get_i18n().get_translator()
+except:
+    _ = lambda s: s
 
 
 class MySQLService(BaseService):

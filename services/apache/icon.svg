@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- Apache Web Server Icon -->
+  <rect x="8" y="12" width="48" height="40" rx="4" fill="#D42029" stroke="#000" stroke-width="2"/>
+  <path d="M 16,24 L 48,24" stroke="#fff" stroke-width="2" opacity="0.3"/>
+  <path d="M 16,32 L 48,32" stroke="#fff" stroke-width="2" opacity="0.3"/>
+  <path d="M 16,40 L 48,40" stroke="#fff" stroke-width="2" opacity="0.3"/>
+  <circle cx="32" cy="28" r="8" fill="#fff"/>
+  <text x="32" y="34" font-family="monospace" font-size="12" font-weight="bold" text-anchor="middle" fill="#D42029">A</text>
+</svg>

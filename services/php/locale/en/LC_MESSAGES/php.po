@@ -1,0 +1,31 @@
+# PHP Service - English Translation
+# Copyright (C) 2026 Orkesta Team
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PHP Service 1.0\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "PHP Interpreter"
+msgstr "PHP Interpreter"
+
+msgid "Install"
+msgstr "Install"
+
+msgid "Versions"
+msgstr "Versions"
+
+msgid "Extensions"
+msgstr "Extensions"
+
+msgid "Install Extension"
+msgstr "Install Extension"
+
+msgid "Active Version"
+msgstr "Active Version"
+
+msgid "Switch Version"
+msgstr "Switch Version"

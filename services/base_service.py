@@ -15,7 +15,7 @@ import os
 logger = logging.getLogger(__name__)
 
 try:
-    from src.utils.i18n import get_i18n
+    from utils.i18n import get_i18n
     _ = get_i18n().get_translator()
 except:
     _ = lambda s: s
@@ -49,6 +49,8 @@ class BaseService(ABC):
     def __init__(self, platform_manager):
         self.platform_manager = platform_manager
         self._status = ServiceStatus.UNKNOWN
+        self.metadata = {}  # ServiceLoader tarafından doldurulur
+        self.plugin_dir = None  # ServiceLoader tarafından doldurulur
     
     @property
     @abstractmethod
@@ -59,18 +61,31 @@ class BaseService(ABC):
     # Optional properties with defaults (UI compatibility)
     @property
     def display_name(self) -> str:
-        """Display name for UI (default: capitalized name)"""
-        return self.name.upper()
+        """Display name for UI (metadata'dan veya default)"""
+        return self.metadata.get('display_name', self.name.upper())
     
     @property
     def description(self) -> str:
-        """Service description (optional)"""
-        return f"{self.display_name} service"
+        """Service description (metadata'dan veya default)"""
+        return self.metadata.get('description', f"{self.display_name} service")
     
     @property
     def icon_name(self) -> str:
-        """Icon name (optional)"""
-        return "application-x-executable"
+        """GTK icon name (metadata'dan veya default)"""
+        return self.metadata.get('icon', 'application-x-executable')
+    
+    def get_icon_path(self) -> Optional[str]:
+        """
+        Servisin kendi SVG ikonunu döndürür (varsa)
+        
+        Returns:
+            icon.svg'nin tam yolu veya None
+        """
+        if self.plugin_dir and 'icon_path' in self.metadata:
+            icon_file = os.path.join(self.plugin_dir, self.metadata['icon_path'])
+            if os.path.exists(icon_file):
+                return icon_file
+        return None
     
     @property
     def service_type(self) -> ServiceType:
@@ -95,41 +110,50 @@ class BaseService(ABC):
         else:
             return ServiceStatus.STOPPED
     
+    # ============================================
+    # ABSTRACT METHODS - Minimum Requirements
+    # ============================================
+    
     @abstractmethod
     def is_installed(self) -> bool:
+        """Service yüklü mü? (ZORUNLU)"""
         pass
     
-    @abstractmethod
+    # ============================================
+    # OPTIONAL METHODS - Default Implementations
+    # ============================================
+    
     def install(self) -> Tuple[bool, str]:
-        pass
+        """Service yükleme (isteğe bağlı)"""
+        return False, _("Installation not implemented for this service")
     
-    @abstractmethod
     def uninstall(self) -> Tuple[bool, str]:
-        pass
+        """Service kaldırma (isteğe bağlı)"""
+        return False, _("Uninstallation not implemented for this service")
     
-    @abstractmethod
     def start(self) -> Tuple[bool, str]:
-        pass
+        """Service başlatma (isteğe bağlı)"""
+        return False, _("Start not implemented for this service")
     
-    @abstractmethod
     def stop(self) -> Tuple[bool, str]:
-        pass
+        """Service durdurma (isteğe bağlı)"""
+        return False, _("Stop not implemented for this service")
     
-    @abstractmethod
     def restart(self) -> Tuple[bool, str]:
-        pass
+        """Service yeniden başlatma (isteğe bağlı)"""
+        return False, _("Restart not implemented for this service")
     
-    @abstractmethod
     def is_running(self) -> bool:
-        pass
+        """Service çalışıyor mu? (isteğe bağlı)"""
+        return False
     
-    @abstractmethod
     def enable(self) -> Tuple[bool, str]:
-        pass
+        """Service otomatik başlatmayı aç (isteğe bağlı)"""
+        return False, _("Enable not implemented for this service")
     
-    @abstractmethod
     def disable(self) -> Tuple[bool, str]:
-        pass
+        """Service otomatik başlatmayı kapat (isteğe bağlı)"""
+        return False, _("Disable not implemented for this service")
     
     # ============================================
     # UI METHODS - Service-Specific Views

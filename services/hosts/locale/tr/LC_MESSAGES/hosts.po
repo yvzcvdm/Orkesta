@@ -1,0 +1,31 @@
+# Hosts Service - Turkish Translation
+# Copyright (C) 2026 Orkesta Team
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Hosts Service 1.0\n"
+"Language: tr\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Hosts File Manager"
+msgstr "Hosts Dosya Yöneticisi"
+
+msgid "Add Host"
+msgstr "Host Ekle"
+
+msgid "Remove Host"
+msgstr "Host Sil"
+
+msgid "IP Address"
+msgstr "IP Adresi"
+
+msgid "Hostname"
+msgstr "Host Adı"
+
+msgid "Backup"
+msgstr "Yedekle"
+
+msgid "Restore"
+msgstr "Geri Yükle"

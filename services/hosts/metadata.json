@@ -1,0 +1,13 @@
+{
+  "name": "hosts",
+  "display_name": "Hosts Manager",
+  "version": "1.0.0",
+  "author": "Orkesta Team",
+  "description": "Manage /etc/hosts file for local domain mapping",
+  "icon": "network-server-symbolic",
+  "icon_path": "icon.svg",
+  "category": "system",
+  "entry_class": "SystemHostsService",
+  "requires": [],
+  "enabled": true
+}

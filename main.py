@@ -30,7 +30,7 @@ def main():
         pass  # Sudo yoksa da devam et
     
     try:
-        from src.app import main as gtk_main
+        from app import main as gtk_main
         return gtk_main()
     except ImportError as e:
         print("=" * 60)

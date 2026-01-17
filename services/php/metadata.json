@@ -5,7 +5,9 @@
   "author": "Orkesta Team",
   "description": "PHP version and extension management",
   "icon": "application-x-php-symbolic",
-  "category": "language",
+  "icon_path": "icon.svg",
+  "category": "runtime",
+  "entry_class": "PHPService",
   "requires": [],
   "enabled": true
 }

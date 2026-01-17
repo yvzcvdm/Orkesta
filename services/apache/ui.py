@@ -9,8 +9,8 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw
 import logging
-from src.ui.services.base_view import BaseServiceView
-from src.utils.i18n import get_i18n
+from ui.services.base_view import BaseServiceView
+from utils.i18n import get_i18n
 
 logger = logging.getLogger(__name__)
 _ = get_i18n().get_translator()
@@ -25,10 +25,79 @@ class ApacheView(BaseServiceView):
     
     def _add_custom_sections(self):
         """Apache'ye özel bölümler"""
+        self._add_port_management_section()
         self._add_apache_modules_section()
         self._add_php_modules_section()
         self._add_ssl_section()
         self._add_vhosts_section()
+    
+    def _add_port_management_section(self):
+        """Port yönetimi bölümü"""
+        ports_group = Adw.PreferencesGroup()
+        ports_group.set_title(_("Port Management"))
+        ports_group.set_description(_("Manage Apache listening ports"))
+        
+        try:
+            # Get current ports
+            ports = self.service.list_ports()
+            
+            # Show current ports
+            for port_info in ports:
+                port = port_info.get('port')
+                is_ssl = port_info.get('ssl', False)
+                
+                port_row = Adw.ActionRow()
+                port_row.set_title(f"Port {port}")
+                
+                if is_ssl:
+                    port_row.set_subtitle(_("SSL/HTTPS"))
+                    ssl_icon = Gtk.Image.new_from_icon_name("security-high-symbolic")
+                    port_row.add_prefix(ssl_icon)
+                else:
+                    port_row.set_subtitle(_("HTTP"))
+                    http_icon = Gtk.Image.new_from_icon_name("network-server-symbolic")
+                    port_row.add_prefix(http_icon)
+                
+                # Remove button (don't allow removing 80 and 443 easily)
+                if port not in [80, 443]:
+                    remove_btn = Gtk.Button()
+                    remove_btn.set_icon_name("user-trash-symbolic")
+                    remove_btn.set_valign(Gtk.Align.CENTER)
+                    remove_btn.add_css_class("flat")
+                    remove_btn.connect("clicked", lambda b, p=port: self._on_port_remove(p))
+                    port_row.add_suffix(remove_btn)
+                
+                ports_group.add(port_row)
+            
+            # Add port button
+            add_port_row = Adw.ActionRow()
+            add_port_row.set_title(_("Add Port"))
+            add_port_row.set_subtitle(_("Add a new listening port"))
+            add_port_row.set_activatable(True)
+            add_port_row.connect("activated", lambda r: self._on_port_add())
+            add_icon = Gtk.Image.new_from_icon_name("list-add-symbolic")
+            add_port_row.add_prefix(add_icon)
+            ports_group.add(add_port_row)
+            
+            # Change port button
+            change_port_row = Adw.ActionRow()
+            change_port_row.set_title(_("Change Port"))
+            change_port_row.set_subtitle(_("Change an existing port number"))
+            change_port_row.set_activatable(True)
+            change_port_row.connect("activated", lambda r: self._on_port_change())
+            change_icon = Gtk.Image.new_from_icon_name("emblem-synchronizing-symbolic")
+            change_port_row.add_prefix(change_icon)
+            ports_group.add(change_port_row)
+        
+        except Exception as e:
+            logger.error(f"Error loading ports: {e}")
+            error_row = Adw.ActionRow()
+            error_row.set_title(_("Error"))
+            error_row.set_subtitle(str(e))
+            error_row.set_sensitive(False)
+            ports_group.add(error_row)
+        
+        self.main_box.append(ports_group)
     
     def _add_apache_modules_section(self):
         """Apache modülleri yönetimi"""
@@ -319,3 +388,158 @@ class ApacheView(BaseServiceView):
     def _show_vhost_detail(self, vhost):
         """VirtualHost detayını göster"""
         self.main_window._show_vhost_detail(self.service, vhost)
+    
+    def _on_port_add(self):
+        """Yeni port ekle"""
+        dialog = Adw.MessageDialog.new(self.main_window)
+        dialog.set_heading(_("Add Port"))
+        dialog.set_body(_("Enter the port number Apache should listen on"))
+        
+        # Create content box
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        content_box.set_margin_start(12)
+        content_box.set_margin_end(12)
+        content_box.set_margin_top(12)
+        content_box.set_margin_bottom(12)
+        
+        # Port entry
+        port_entry = Gtk.Entry()
+        port_entry.set_placeholder_text(_("Port number (1-65535)"))
+        port_entry.set_input_purpose(Gtk.InputPurpose.DIGITS)
+        content_box.append(port_entry)
+        
+        # SSL checkbox
+        ssl_check = Gtk.CheckButton()
+        ssl_check.set_label(_("SSL/HTTPS port"))
+        content_box.append(ssl_check)
+        
+        dialog.set_extra_child(content_box)
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("add", _("Add"))
+        dialog.set_response_appearance("add", Adw.ResponseAppearance.SUGGESTED)
+        dialog.set_default_response("add")
+        
+        def on_response(dialog, response):
+            if response == "add":
+                try:
+                    port = int(port_entry.get_text().strip())
+                    if port < 1 or port > 65535:
+                        self.main_window._show_toast(_("Invalid port number. Must be between 1-65535"))
+                        return
+                    
+                    is_ssl = ssl_check.get_active()
+                    success, message = self.service.add_port(port, is_ssl)
+                    self.main_window._show_toast(message)
+                    
+                    if success:
+                        dialog.close()
+                        # Refresh view
+                        self.main_window._refresh_detail_page()
+                except ValueError:
+                    self.main_window._show_toast(_("Please enter a valid port number"))
+        
+        dialog.connect("response", on_response)
+        dialog.present()
+    
+    def _on_port_remove(self, port):
+        """Port kaldır"""
+        dialog = Adw.MessageDialog.new(self.main_window)
+        dialog.set_heading(_("Remove Port {port}?").format(port=port))
+        
+        if port in [80, 443]:
+            dialog.set_body(_("Warning: Removing default port {port} may break virtual hosts.\n\nAre you sure you want to continue?").format(port=port))
+        else:
+            dialog.set_body(_("Are you sure you want to remove port {port}?").format(port=port))
+        
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("remove", _("Remove"))
+        dialog.set_response_appearance("remove", Adw.ResponseAppearance.DESTRUCTIVE)
+        
+        def on_response(dialog, response):
+            if response == "remove":
+                success, message = self.service.remove_port(port)
+                self.main_window._show_toast(message)
+                
+                if success:
+                    dialog.close()
+                    # Refresh view
+                    self.main_window._refresh_detail_page()
+        
+        dialog.connect("response", on_response)
+        dialog.present()
+    
+    def _on_port_change(self):
+        """Port değiştir"""
+        # Get current ports
+        ports = self.service.list_ports()
+        
+        if not ports:
+            self.main_window._show_toast(_("No ports configured"))
+            return
+        
+        dialog = Adw.MessageDialog.new(self.main_window)
+        dialog.set_heading(_("Change Port"))
+        dialog.set_body(_("Select the port to change and enter the new port number"))
+        
+        # Create content box
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        content_box.set_margin_start(12)
+        content_box.set_margin_end(12)
+        content_box.set_margin_top(12)
+        content_box.set_margin_bottom(12)
+        
+        # Old port dropdown
+        old_port_label = Gtk.Label(label=_("Current Port:"))
+        old_port_label.set_halign(Gtk.Align.START)
+        content_box.append(old_port_label)
+        
+        old_port_dropdown = Gtk.DropDown()
+        port_strings = [str(p['port']) for p in ports]
+        old_port_dropdown.set_model(Gtk.StringList.new(port_strings))
+        content_box.append(old_port_dropdown)
+        
+        # New port entry
+        new_port_label = Gtk.Label(label=_("New Port:"))
+        new_port_label.set_halign(Gtk.Align.START)
+        content_box.append(new_port_label)
+        
+        new_port_entry = Gtk.Entry()
+        new_port_entry.set_placeholder_text(_("Port number (1-65535)"))
+        new_port_entry.set_input_purpose(Gtk.InputPurpose.DIGITS)
+        content_box.append(new_port_entry)
+        
+        dialog.set_extra_child(content_box)
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("change", _("Change"))
+        dialog.set_response_appearance("change", Adw.ResponseAppearance.SUGGESTED)
+        dialog.set_default_response("change")
+        
+        def on_response(dialog, response):
+            if response == "change":
+                try:
+                    selected_idx = old_port_dropdown.get_selected()
+                    old_port = int(port_strings[selected_idx])
+                    new_port = int(new_port_entry.get_text().strip())
+                    
+                    if new_port < 1 or new_port > 65535:
+                        self.main_window._show_toast(_("Invalid port number. Must be between 1-65535"))
+                        return
+                    
+                    if old_port == new_port:
+                        self.main_window._show_toast(_("Old and new port are the same"))
+                        return
+                    
+                    success, message = self.service.set_port(old_port, new_port)
+                    self.main_window._show_toast(message)
+                    
+                    if success:
+                        dialog.close()
+                        # Refresh view
+                        self.main_window._refresh_detail_page()
+                except ValueError:
+                    self.main_window._show_toast(_("Please enter a valid port number"))
+                except IndexError:
+                    self.main_window._show_toast(_("Please select a port"))
+        
+        dialog.connect("response", on_response)
+        dialog.present()

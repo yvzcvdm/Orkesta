@@ -1,0 +1,31 @@
+# PHP Service - Turkish Translation
+# Copyright (C) 2026 Orkesta Team
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PHP Service 1.0\n"
+"Language: tr\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "PHP Interpreter"
+msgstr "PHP Yorumlayıcı"
+
+msgid "Install"
+msgstr "Kur"
+
+msgid "Versions"
+msgstr "Sürümler"
+
+msgid "Extensions"
+msgstr "Uzantılar"
+
+msgid "Install Extension"
+msgstr "Uzantı Kur"
+
+msgid "Active Version"
+msgstr "Aktif Sürüm"
+
+msgid "Switch Version"
+msgstr "Sürüm Değiştir"

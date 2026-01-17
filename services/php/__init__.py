@@ -12,9 +12,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Import i18n
+# Import standalone i18n (bağımsız)
 try:
-    from src.utils.i18n import get_i18n
+    from .i18n import get_i18n
     _ = get_i18n().get_translator()
 except:
     _ = lambda s: s

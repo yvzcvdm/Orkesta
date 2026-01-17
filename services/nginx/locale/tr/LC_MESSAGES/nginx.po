@@ -1,0 +1,22 @@
+# Nginx Service - Turkish Translation
+# Copyright (C) 2026 Orkesta Team
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Nginx Service 1.0\n"
+"Language: tr\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Nginx Web Server"
+msgstr "Nginx Web Sunucusu"
+
+msgid "Install"
+msgstr "Kur"
+
+msgid "Start"
+msgstr "Başlat"
+
+msgid "Stop"
+msgstr "Durdur"

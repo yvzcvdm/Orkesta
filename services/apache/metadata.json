@@ -5,7 +5,9 @@
   "author": "Orkesta Team",
   "description": "Apache HTTP Server with VirtualHost and SSL management",
   "icon": "network-server-symbolic",
+  "icon_path": "icon.svg",
   "category": "web_server",
+  "entry_class": "ApacheService",
   "requires": [],
   "enabled": true
 }
