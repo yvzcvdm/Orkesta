@@ -1,7 +1,8 @@
-# Byte-compiled / optimized / DLL files
+# Python - Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyc
 
 # C extensions
 *.so
@@ -29,15 +30,21 @@ ENV/
 env/
 .venv/
 
-# Pytest
+# Testing
 .cache/
 .pytest_cache/
+.coverage
+htmlcov/
 
-# mypy
+# Type checking
 .mypy_cache/
 
-# VS Code
+# IDEs
 .vscode/
+.idea/
+*.swp
+*.swo
+*~
 
 # OS files
 .DS_Store
@@ -46,19 +53,26 @@ Thumbs.db
 # Logs and databases
 *.log
 *.sqlite3
+logs/
 
 # pip
 pip-log.txt
 pip-delete-this-directory.txt
 
-# IDE specific
-.idea/
-
-# translations
+# Translations
 *.mo
-
-# Ignore compiled translations and backup files
 *.po~
 
-# Node
+# Temporary files
+*.tmp
+*.bak
+
+# Local configuration
+local_config.py
+.env
+
+# Node (if needed)
 node_modules/
+
+# Keep .github/ directory (including copilot-instructions.md)
+!.github/
