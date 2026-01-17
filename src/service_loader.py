@@ -41,7 +41,17 @@ class ServiceLoader:
         self._load_services()
     
     def _load_services(self) -> None:
-        """services/ klasöründeki tüm servis modüllerini yükle"""
+        """
+        services/ klasöründeki tüm servis modüllerini yükle
+        
+        Yeni modüler yapı (Plugin sistemi):
+        services/
+          apache/
+            __init__.py    # ApacheService class
+            apache.sh      # Script
+            ui.py         # UI view
+            metadata.json # Bilgiler
+        """
         if not os.path.exists(self.services_dir):
             logger.error(f"Servis klasörü bulunamadı: {self.services_dir}")
             return
@@ -52,16 +62,33 @@ class ServiceLoader:
         if self.services_dir not in sys.path:
             sys.path.insert(0, os.path.dirname(self.services_dir))
         
-        # .py dosyalarını listele
+        # Klasörleri listele (her klasör bir plugin/service)
+        service_dirs = [
+            d for d in os.listdir(self.services_dir)
+            if os.path.isdir(os.path.join(self.services_dir, d))
+            and not d.startswith('_')
+            and not d == '__pycache__'
+        ]
+        
+        logger.info(f"Bulunan servis modülleri: {service_dirs}")
+        
+        for service_dir in service_dirs:
+            # Her klasörde __init__.py olmalı
+            init_file = os.path.join(self.services_dir, service_dir, '__init__.py')
+            if os.path.exists(init_file):
+                self._load_service_module(service_dir)
+            else:
+                logger.warning(f"Servis klasöründe __init__.py yok: {service_dir}")
+        
+        # Geriye dönük uyumluluk: .py dosyaları (eski yapı)
         service_files = [
             f for f in os.listdir(self.services_dir)
             if f.endswith('.py') and not f.startswith('_') and f != 'base_service.py'
         ]
         
-        logger.info(f"Bulunan servis dosyaları: {service_files}")
-        
         for service_file in service_files:
-            module_name = service_file[:-3]  # .py uzantısını kaldır
+            module_name = service_file[:-3]
+            logger.info(f"Eski yapıda servis bulundu: {module_name}")
             self._load_service_module(module_name)
     
     def _load_service_module(self, module_name: str) -> None:

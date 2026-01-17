@@ -1,0 +1,11 @@
+{
+  "name": "mysql",
+  "display_name": "MySQL Database",
+  "version": "1.0.0",
+  "author": "Orkesta Team",
+  "description": "MySQL/MariaDB database server management",
+  "icon": "server-database-symbolic",
+  "category": "database",
+  "requires": [],
+  "enabled": true
+}

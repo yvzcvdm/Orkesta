@@ -82,6 +82,11 @@ class BaseService(ABC):
         """Default port for the service (optional)"""
         return None
     
+    @property
+    def can_uninstall(self) -> bool:
+        """Can this service be uninstalled? (default: True)"""
+        return True
+    
     def get_status(self) -> ServiceStatus:
         if not self.is_installed():
             return ServiceStatus.NOT_INSTALLED
@@ -127,6 +132,23 @@ class BaseService(ABC):
         pass
     
     # ============================================
+    # UI METHODS - Service-Specific Views
+    # ============================================
+    
+    def get_detail_view(self, main_window) -> Optional[Any]:
+        """
+        Servisin detay görünümünü döndürür.
+        Her servis kendi UI'ını buradan döndürebilir.
+        
+        Args:
+            main_window: MainWindow instance (callbacks için)
+        
+        Returns:
+            Gtk.Widget veya None (default view kullanılacak)
+        """
+        return None  # Default: BaseServiceView kullanılacak
+    
+    # ============================================
     # HELPER METHODS - Script Execution
     # ============================================
     
@@ -134,17 +156,24 @@ class BaseService(ABC):
         """
         Script çalıştır (CLI-First yaklaşımı)
         
+        Yeni modüler yapı: Script servisin kendi klasöründe.
+        Örnek: services/apache/apache.sh
+        
         Args:
-            script_path: Script yolu (örn: scripts/apache/install.sh)
+            script_path: Script adı (örn: 'apache.sh')
             args: Script parametreleri
             timeout: Timeout (saniye)
         
         Returns:
             (success: bool, message: str)
         """
-        # Script tam yolu
+        # Script tam yolu - servisle aynı klasörde
         if not os.path.isabs(script_path):
-            script_path = os.path.join(SCRIPTS_DIR, script_path)
+            # Servisin bulunduğu modül klasörünü bul
+            import inspect
+            service_file = inspect.getfile(self.__class__)
+            service_dir = os.path.dirname(service_file)
+            script_path = os.path.join(service_dir, script_path)
         
         # Script var mı kontrol et
         if not os.path.exists(script_path):
@@ -152,13 +181,19 @@ class BaseService(ABC):
             return False, _("Script file not found: {path}").format(path=script_path)
         
         # Read-only komutlar - sudo gerektirmez
+        # NOT: /etc/hosts okumak bile sudo gerektirebilir, bu yüzden hosts komutları sudo ile çalışır
         readonly_commands = [
             'is-installed', 'is-running', 'version-get-active', 
             'version-list-installed', 'version-list-available',
             'extension-list',
             'database-list', 'user-list',
-            'php-get-active', 'ssl-is-enabled',
-            'get-version', 'log-tail', 'log-view'
+            'php-get-active', 'php-list-versions', 'ssl-is-enabled',
+            'get-version', 'log-tail', 'log-view',
+            'vhost-list', 'vhost-details',
+            'module-list', 'status-info', 'check-root-password',
+            'info', 'extension-list-installed',
+            # Hosts file - /etc/hosts okumak bile sudo gerektirir
+            # 'list', 'exists', 'validate'  # Bu komutlar sudo ile çalışacak
         ]
         
         # İlk argüman read-only komut mu?
@@ -169,8 +204,8 @@ class BaseService(ABC):
         # Komutu oluştur
         cmd = []
         if needs_sudo:
-            # pkexec kullan - GUI uygulamalarda çalışır, sistem auth dialogu açar
-            cmd.append('pkexec')
+            # sudo kullan - başlangıçta cache'lenmiş olacak
+            cmd.append('sudo')
         
         cmd.append(script_path)
         cmd.extend(args)

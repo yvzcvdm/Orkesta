@@ -1,0 +1,11 @@
+{
+  "name": "php",
+  "display_name": "PHP",
+  "version": "1.0.0",
+  "author": "Orkesta Team",
+  "description": "PHP version and extension management",
+  "icon": "application-x-php-symbolic",
+  "category": "language",
+  "requires": [],
+  "enabled": true
+}

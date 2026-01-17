@@ -91,6 +91,7 @@ class MainWindow(Adw.ApplicationWindow):
         # Menü butonu
         menu_button = Gtk.MenuButton()
         menu_button.set_icon_name("open-menu-symbolic")
+        menu_button.set_menu_model(self._create_menu())
         self.header.pack_end(menu_button)
         
         main_box.append(self.header)
@@ -121,6 +122,22 @@ class MainWindow(Adw.ApplicationWindow):
         
         # Ana box'ı window'a ekle
         self.set_content(main_box)
+    
+    def _create_menu(self):
+        """Create application menu"""
+        menu = Gio.Menu()
+        
+        # About section
+        about_section = Gio.Menu()
+        about_section.append(_("About Orkesta"), "app.about")
+        menu.append_section(None, about_section)
+        
+        # Create actions
+        about_action = Gio.SimpleAction.new("about", None)
+        about_action.connect("activate", self._on_about)
+        self.get_application().add_action(about_action)
+        
+        return menu
     
     def _create_sidebar(self):
         """Sidebar oluştur"""
@@ -703,7 +720,8 @@ class MainWindow(Adw.ApplicationWindow):
     def _on_service_row_activated(self, listbox, row):
         """Service row activated - show detail"""
         if hasattr(row, 'service'):
-            self._show_service_detail(row.service)
+            service = row.service
+            self._show_service_detail(service)
     
     def _on_back_clicked(self, button):
         """Back button clicked - return to service list"""
@@ -803,136 +821,36 @@ class MainWindow(Adw.ApplicationWindow):
             self.main_stack.set_visible_child_name("detail")
     
     def _create_service_detail_page(self, service):
-        """Create service detail page"""
-        scrolled = Gtk.ScrolledWindow()
-        scrolled.set_vexpand(True)
-        scrolled.set_hexpand(True)
+        """
+        Create service detail page
         
-        main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        main_box.set_spacing(24)
-        main_box.set_margin_top(24)
-        main_box.set_margin_bottom(24)
-        main_box.set_margin_start(24)
-        main_box.set_margin_end(24)
+        Yeni modüler mimari: Her servis kendi UI'ını döndürür.
+        """
+        # Servis kendi detail view'ını döndürebilir mi?
+        custom_view = service.get_detail_view(self)
         
-        # Header section
-        header_group = Adw.PreferencesGroup()
-        header_group.set_title(service.display_name)
-        header_group.set_description(service.description)
+        if custom_view is not None:
+            # Servis kendi UI'ını sağladı
+            return custom_view
         
-        # Status row
-        status = service.get_status().value
-        status_row = Adw.ActionRow()
-        status_row.set_title(_("Status"))
-        
-        if status == "running":
-            status_label = Gtk.Label(label="🟢 Running")
-            status_label.add_css_class("success")
-        elif status == "stopped":
-            status_label = Gtk.Label(label="🔴 Stopped")
-            status_label.add_css_class("warning")
-        elif status == "not_installed":
-            status_label = Gtk.Label(label="❌ Not Installed")
-            status_label.add_css_class("error")
-        else:
-            status_label = Gtk.Label(label="⚪ Unknown")
-        
-        status_row.add_suffix(status_label)
-        header_group.add(status_row)
-        
-        # Port row
-        if service.default_port:
-            port_row = Adw.ActionRow()
-            port_row.set_title(_("Port"))
-            port_label = Gtk.Label(label=str(service.default_port))
-            port_label.add_css_class("monospace")
-            port_row.add_suffix(port_label)
-            header_group.add(port_row)
-        
-        # Type row
-        type_row = Adw.ActionRow()
-        type_row.set_title(_("Type"))
-        type_label = Gtk.Label(label=service.service_type.value.replace('_', ' ').title())
-        type_row.add_suffix(type_label)
-        header_group.add(type_row)
-        
-        main_box.append(header_group)
-        
-        # Actions section
-        actions_group = Adw.PreferencesGroup()
-        actions_group.set_title(_("Actions"))
-        
-        if service.is_installed():
-            # Service control buttons
-            if service.is_running():
-                # Stop button
-                stop_row = Adw.ActionRow()
-                stop_row.set_title(_("Stop Service"))
-                stop_row.set_subtitle(_("Stop the running service"))
-                stop_row.set_activatable(True)
-                stop_row.connect("activated", lambda r: self._on_service_stop(service))
-                stop_icon = Gtk.Image.new_from_icon_name("media-playback-stop-symbolic")
-                stop_row.add_prefix(stop_icon)
-                actions_group.add(stop_row)
-                
-                # Restart button
-                restart_row = Adw.ActionRow()
-                restart_row.set_title(_("Restart Service"))
-                restart_row.set_subtitle(_("Restart the service"))
-                restart_row.set_activatable(True)
-                restart_row.connect("activated", lambda r: self._on_service_restart(service))
-                restart_icon = Gtk.Image.new_from_icon_name("view-refresh-symbolic")
-                restart_row.add_prefix(restart_icon)
-                actions_group.add(restart_row)
-            else:
-                # Start button
-                start_row = Adw.ActionRow()
-                start_row.set_title(_("Start Service"))
-                start_row.set_subtitle(_("Start the service"))
-                start_row.set_activatable(True)
-                start_row.connect("activated", lambda r: self._on_service_start(service))
-                start_icon = Gtk.Image.new_from_icon_name("media-playback-start-symbolic")
-                start_row.add_prefix(start_icon)
-                actions_group.add(start_row)
+        # Default view (BaseServiceView kullan)
+        from src.ui.services.base_view import BaseServiceView
+        view = BaseServiceView(service, self)
+        return view.create_view()
+    
+    def _refresh_detail_page(self):
+        """Detay sayfasını yenile (view refresh için)"""
+        if self.current_service:
+            detail_page = self._create_service_detail_page(self.current_service)
             
-            # Uninstall button
-            uninstall_row = Adw.ActionRow()
-            uninstall_row.set_title(_("Uninstall"))
-            uninstall_row.set_subtitle(_("Remove this service from your system"))
-            uninstall_row.set_activatable(True)
-            uninstall_row.connect("activated", lambda r: self._on_service_uninstall(service))
-            uninstall_icon = Gtk.Image.new_from_icon_name("user-trash-symbolic")
-            uninstall_row.add_prefix(uninstall_icon)
-            actions_group.add(uninstall_row)
-        else:
-            # Install button
-            install_row = Adw.ActionRow()
-            install_row.set_title(_("Install"))
-            install_row.set_subtitle(_("Install this service and its dependencies"))
-            install_row.set_activatable(True)
-            install_row.connect("activated", lambda r: self._on_service_install(service))
-            install_icon = Gtk.Image.new_from_icon_name("document-save-symbolic")
-            install_row.add_prefix(install_icon)
-            actions_group.add(install_row)
-        
-        main_box.append(actions_group)
-        
-        # Apache specific sections
-        if service.name == "apache" and service.is_installed():
-            self._add_apache_sections(main_box, service)
-        
-        # MySQL specific sections
-        if service.name == "mysql" and service.is_installed():
-            self._add_mysql_sections(main_box, service)
-        
-        # PHP specific sections
-        if service.name == "php" and service.is_installed():
-            self._add_php_sections(main_box, service)
-        
-        # (Removed unused placeholder Configuration and Logs sections)
-        
-        scrolled.set_child(main_box)
-        return scrolled
+            # Eski detail page'i kaldır
+            old_detail = self.main_stack.get_child_by_name("detail")
+            if old_detail:
+                self.main_stack.remove(old_detail)
+            
+            # Yeni detail page ekle
+            self.main_stack.add_named(detail_page, "detail")
+            self.main_stack.set_visible_child_name("detail")
     
     def _add_mysql_sections(self, main_box, service):
         """Add MySQL-specific sections to detail page"""
@@ -3621,3 +3539,201 @@ class MainWindow(Adw.ApplicationWindow):
         
         confirm_dialog.connect("response", on_confirm)
         confirm_dialog.present()
+    
+    # ==================== HOSTS MANAGER SECTIONS ====================
+    
+    def _add_hosts_sections(self, main_box, service):
+        """Add Hosts Manager sections to detail page"""
+        
+        # Hosts entries list
+        entries_group = Adw.PreferencesGroup()
+        entries_group.set_title(_("Hosts Entries"))
+        entries_group.set_description(_("Manage local domain mappings in /etc/hosts file"))
+        
+        # Add entry button
+        add_row = Adw.ActionRow()
+        add_row.set_title(_("Add New Entry"))
+        add_row.set_subtitle(_("Add a new domain → IP mapping"))
+        add_row.set_activatable(True)
+        add_button = Gtk.Button()
+        add_button.set_icon_name("list-add-symbolic")
+        add_button.set_valign(Gtk.Align.CENTER)
+        add_button.add_css_class("flat")
+        add_row.add_suffix(add_button)
+        add_row.connect("activated", lambda r: self._on_hosts_add_entry(service))
+        entries_group.add(add_row)
+        
+        main_box.append(entries_group)
+        
+        # Current entries
+        entries = service.list_entries()
+        
+        if entries:
+            current_group = Adw.PreferencesGroup()
+            current_group.set_title(_("Current Entries ({count})").format(count=len(entries)))
+            
+            for entry in entries:
+                entry_row = Adw.ActionRow()
+                entry_row.set_title(entry['domain'])
+                entry_row.set_subtitle(entry['ip'])
+                
+                # Delete button
+                delete_button = Gtk.Button()
+                delete_button.set_icon_name("user-trash-symbolic")
+                delete_button.set_valign(Gtk.Align.CENTER)
+                delete_button.add_css_class("destructive-action")
+                delete_button.connect("clicked", lambda b, e=entry: self._on_hosts_delete_entry(service, e))
+                entry_row.add_suffix(delete_button)
+                
+                current_group.add(entry_row)
+            
+            main_box.append(current_group)
+        else:
+            # Empty state
+            empty_group = Adw.PreferencesGroup()
+            empty_label = Gtk.Label()
+            empty_label.set_markup(f"<span foreground='#666666'>{_('No hosts entries yet. Add your first entry to get started.')}</span>")
+            empty_label.set_margin_top(12)
+            empty_label.set_margin_bottom(12)
+            empty_group.add(empty_label)
+            main_box.append(empty_group)
+        
+        # Backup/Restore section
+        backup_group = Adw.PreferencesGroup()
+        backup_group.set_title(_("Backup and Restore"))
+        
+        # Backup button
+        backup_row = Adw.ActionRow()
+        backup_row.set_title(_("Backup Hosts File"))
+        backup_row.set_subtitle(_("Create a backup of /etc/hosts"))
+        backup_row.set_activatable(True)
+        backup_row.connect("activated", lambda r: self._on_hosts_backup(service))
+        backup_group.add(backup_row)
+        
+        # Restore button
+        restore_row = Adw.ActionRow()
+        restore_row.set_title(_("Restore Hosts File"))
+        restore_row.set_subtitle(_("Restore from backup"))
+        restore_row.set_activatable(True)
+        restore_row.connect("activated", lambda r: self._on_hosts_restore(service))
+        backup_group.add(restore_row)
+        
+        main_box.append(backup_group)
+    
+    def _on_hosts_add_entry(self, service):
+        """Show add hosts entry dialog"""
+        dialog = Adw.MessageDialog.new(self)
+        dialog.set_heading(_("Add Hosts Entry"))
+        dialog.set_body(_("Add a new domain → IP mapping"))
+        
+        # Content box
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        content_box.set_spacing(12)
+        content_box.set_margin_top(12)
+        
+        # Domain entry
+        domain_entry = Adw.EntryRow()
+        domain_entry.set_title(_("Domain"))
+        content_box.append(domain_entry)
+        
+        # IP entry
+        ip_entry = Adw.EntryRow()
+        ip_entry.set_title(_("IP Address"))
+        ip_entry.set_text("127.0.0.1")
+        content_box.append(ip_entry)
+        
+        dialog.set_extra_child(content_box)
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("add", _("Add"))
+        dialog.set_response_appearance("add", Adw.ResponseAppearance.SUGGESTED)
+        dialog.set_default_response("add")
+        dialog.set_close_response("cancel")
+        
+        def on_response(dlg, response):
+            if response == "add":
+                domain = domain_entry.get_text().strip()
+                ip = ip_entry.get_text().strip()
+                
+                if not domain or not ip:
+                    self._show_toast(_("Domain and IP are required"))
+                    return
+                
+                if not service.validate_ip(ip):
+                    self._show_toast(_("Invalid IP address format"))
+                    return
+                
+                success, message = service.add_entry(ip, domain)
+                self._show_toast(message)
+                
+                if success and self.current_service and self.current_service.name == 'system_hosts':
+                    self._refresh_detail_page()
+        
+        dialog.connect("response", on_response)
+        dialog.present()
+    
+    def _on_hosts_delete_entry(self, service, entry):
+        """Delete hosts entry"""
+        dialog = Adw.MessageDialog.new(self)
+        dialog.set_heading(_("Remove Hosts Entry?"))
+        dialog.set_body(_("Remove '{domain}' → {ip} from hosts file?").format(
+            domain=entry['domain'],
+            ip=entry['ip']
+        ))
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("remove", _("Remove"))
+        dialog.set_response_appearance("remove", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.set_default_response("cancel")
+        dialog.set_close_response("cancel")
+        
+        def on_response(dlg, response):
+            if response == "remove":
+                success, message = service.remove_entry(entry['domain'])
+                self._show_toast(message)
+                
+                if success and self.current_service and self.current_service.name == 'system_hosts':
+                    self._refresh_detail_page()
+        
+        dialog.connect("response", on_response)
+        dialog.present()
+    
+    def _on_hosts_backup(self, service):
+        """Backup hosts file"""
+        success, message = service.backup()
+        self._show_toast(message)
+    
+    def _on_hosts_restore(self, service):
+        """Restore hosts file"""
+        dialog = Adw.MessageDialog.new(self)
+        dialog.set_heading(_("Restore Hosts File?"))
+        dialog.set_body(_("This will replace the current hosts file with the backup. Continue?"))
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("restore", _("Restore"))
+        dialog.set_response_appearance("restore", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.set_default_response("cancel")
+        dialog.set_close_response("cancel")
+        
+        def on_response(dlg, response):
+            if response == "restore":
+                success, message = service.restore()
+                self._show_toast(message)
+                
+                if success and self.current_service and self.current_service.name == 'system_hosts':
+                    self._refresh_detail_page()
+        
+        dialog.connect("response", on_response)
+        dialog.present()
+    
+    # ==================== MENU HANDLERS ====================
+    
+    def _on_about(self, action, param):
+        """Show about dialog"""
+        about = Adw.AboutWindow()
+        about.set_transient_for(self)
+        about.set_application_name("Orkesta")
+        about.set_application_icon("applications-development")
+        about.set_version("1.0.0")
+        about.set_developer_name("Orkesta Team")
+        about.set_comments(_("Local Web Development Environment Manager"))
+        about.set_website("https://github.com/orkesta/orkesta")
+        about.set_license_type(Gtk.License.GPL_3_0)
+        about.present()

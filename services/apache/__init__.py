@@ -47,6 +47,16 @@ class ApacheService(BaseService):
     def default_port(self) -> Optional[int]:
         return 80
     
+    # ==================== UI INTEGRATION ====================
+    
+    def get_detail_view(self, main_window) -> Optional[Any]:
+        """Apache'ye özel UI döndür"""
+        from services.apache.ui import ApacheView
+        view = ApacheView(self, main_window)
+        return view.create_view()
+    
+    # ==================== SERVICE METHODS ====================
+    
     def is_installed(self) -> bool:
         """Check if installed via script"""
         success, output = self._execute_script(self.SCRIPT_NAME, 'is-installed', timeout=10)

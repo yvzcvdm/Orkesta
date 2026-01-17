@@ -49,6 +49,14 @@ class PHPService(BaseService):
     def default_port(self) -> Optional[int]:
         return None  # PHP doesn't have a default port
     
+    # ==================== UI INTEGRATION ====================
+    
+    def get_detail_view(self, main_window) -> Optional[Any]:
+        """PHP'ye özel UI döndür"""
+        from services.php.ui import PHPView
+        view = PHPView(self, main_window)
+        return view.create_view()
+    
     # ==================== VERSION MANAGEMENT ====================
     
     def get_installed_versions(self) -> List[str]:

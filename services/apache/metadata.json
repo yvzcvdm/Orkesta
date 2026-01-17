@@ -1,0 +1,11 @@
+{
+  "name": "apache",
+  "display_name": "Apache Web Server",
+  "version": "1.0.0",
+  "author": "Orkesta Team",
+  "description": "Apache HTTP Server with VirtualHost and SSL management",
+  "icon": "network-server-symbolic",
+  "category": "web_server",
+  "requires": [],
+  "enabled": true
+}

@@ -189,6 +189,56 @@ Apache ↔ PHP integration example:
 - PHP service manages versions independently
 - Apache switches PHP via `a2enmod`/`a2dismod` script actions
 
+## Planned System-Level Features
+
+The following features are planned for the core application (NOT service-specific):
+
+### High Priority
+1. **Hosts File Manager** (`services/system_hosts.py` + `scripts/hosts.sh`)
+   - Manage /etc/hosts entries for local domain mapping
+   - Add/edit/delete host entries with validation
+   - Auto-suggest hosts entry when creating Apache vhosts
+   - Backup/restore hosts file
+   - Integration: Works with all web servers (Apache, Nginx, etc.)
+
+2. **Service Orchestrator** (`services/orchestrator.py` + `scripts/orchestrate.sh`)
+   - Start/stop/restart all services at once
+   - Manage service dependencies (MySQL → PHP → Apache order)
+   - "Development Mode" toggle
+   - Bulk operations across services
+
+3. **System Health Monitor** (`services/system_monitor.py` + `scripts/monitor.sh`)
+   - Dashboard showing all services status at once
+   - Disk/RAM/CPU usage monitoring
+   - Port usage checker
+   - Error rate tracking across all services
+
+### Medium Priority
+4. **Notification System** (`src/ui/components/notifications.py`)
+   - System-wide toast messages
+   - Background task completion alerts
+   - Error/warning/success notifications
+   - Non-blocking progress indicators
+
+5. **Quick Actions Panel** (`src/ui/dialogs/quick_actions.py`)
+   - Shortcuts for common workflows
+   - "Create New Project" wizard (vhost + database + folder + hosts)
+   - One-click "System Status" view
+   - Rapid service restart options
+
+### Low Priority
+6. **Global Config Manager** (`services/config_manager.py`)
+   - Application-wide settings (language, theme, notifications)
+   - Default timeout values
+   - User preferences persistence
+
+7. **Firewall Manager** (`services/firewall.py`) - Optional
+   - UFW/firewalld integration
+   - Automatic port management for services
+   - Security rule templates
+
+**Note**: Service-specific features (Apache templates, MySQL backups, PHP configs) belong in their respective service modules, NOT in the core application.
+
 ## References
 
 For deeper architectural understanding, read in order:

@@ -51,6 +51,16 @@ class MySQLService(BaseService):
         """MySQL has basic service management features"""
         return False
     
+    # ==================== UI INTEGRATION ====================
+    
+    def get_detail_view(self, main_window) -> Optional[Any]:
+        """MySQL'e özel UI döndür"""
+        from services.mysql.ui import MySQLView
+        view = MySQLView(self, main_window)
+        return view.create_view()
+    
+    # ==================== HELPERS ====================
+    
     def _execute_script_with_sudo(self, script_name: str, args: list, sudo_password: str = "", timeout: int = 300) -> Tuple[bool, str]:
         """Execute script with sudo password"""
         import os

@@ -20,6 +20,15 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 def main():
     """Ana uygulama fonksiyonu - GTK arayüzünü başlat"""
+    # Başlangıçta bir kez sudo yetkisi al ve cache'le
+    import subprocess
+    try:
+        # sudo cache'i 15 dakika için aktif et
+        subprocess.run(['sudo', '-v'], check=False, capture_output=True)
+        print("✅ Sudo yetkisi alındı (15 dakika geçerli)")
+    except Exception:
+        pass  # Sudo yoksa da devam et
+    
     try:
         from src.app import main as gtk_main
         return gtk_main()
